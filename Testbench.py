@@ -164,8 +164,10 @@ def  evaluate(data,testPerAlg,algs=['euclidean_similarity','pearson_similarity']
         #memberName = 'John Connor'
         #itemName = 'MovieB'
 
+
+        #Maak average algorithm reg dat hy nie BOUNDED IS NIE!!!!!!!!!!!!!!!!!!!
         for i,curAlg in enumerate(algs):
-            rec = recommend(data,memberName, itemName, 1, function_mappings[curAlg])
+            rec = recommend(data,memberName, itemName, 150, function_mappings[curAlg])
             # I don't think mean squared error is needed yet. But it is a good practice to implement when actually
             # using the system.
             results[i] += abs(rec-data[memberName][itemName])
