@@ -17,11 +17,7 @@ point = [[-4,-5]]
 plt.plot(point[0][0],point[0][1],'bo')
 
 print("Centres: ",centres)
-
 print(kmeans.predict(point))
-
-
-
 
 plt.scatter(X[:,0],X[:,1],c='red')
 plt.plot(centres[:,0],centres[:,1],'go')
