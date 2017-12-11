@@ -3,78 +3,150 @@ import numpy as np
 import math
 import random
 import pandas as pd
-from sklearn.cluster import KMeans
+import time
+from scipy.sparse.linalg import svds
+
+#To do
+#1.) Test on a bigger dataset
+#2.) Take each algrithm to there seperate classes
+
 
 def createData():
     r_cols = ['user_id', 'movie_id', 'rating', 'unix_timestamp']
-    ratings = pd.read_csv('ml-100k/u.data', sep='\t', names=r_cols,
+    numUsers = 0
+    numMovies = 0
+
+    with open('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u.user') as myfile:
+        numUsers = sum(1 for line in myfile)
+
+    with open('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u.item') as myfile:
+        numMovies = sum(1 for line in myfile)
+
+
+    #Create training hash and normal table
+    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u1.base', sep='\t', names=r_cols,
                           encoding='latin-1')
-
-    ratings = ratings.drop('unix_timestamp', 1)
-
-    #ratings = ratings[:25]
-
     sortedRate = ratings.sort_values([('user_id')], ascending=True)
-
-    print(sortedRate)
-
-
-    #print(sortedRate)
     values = sortedRate.values
 
-    #values = values[:,0:]
-    #print(values)
-    data = {}
+    hashTrainData = {}
 
     idCount = values[0][0]
 
     tempHash = {}
 
+    tableTrainData = np.zeros((numUsers, numMovies))#Initialize any value not known to 2.5
+
+    #A mapping algorithm might be needed if there are missing user ID's or movie ID's e.g. 1,2,3,5,6
+
+    meanRows = np.zeros(len(tableTrainData))
+    meanColumns = np.zeros(len(tableTrainData[0]))
+    rowCount = np.zeros(len(tableTrainData))
+    columnsCount = np.zeros(len(tableTrainData[0]))
+
     for i in range(len(sortedRate)):
-        #print(values[i][0])
+        tableTrainData[values[i][0]-1][values[i][1]-1] = values[i][2]
+
+        meanRows[values[i][0]-1] += values[i][2]
+        rowCount[values[i][0]-1] += 1
+
+        meanColumns[values[i][1] - 1] += values[i][2]
+        columnsCount[values[i][1] - 1] += 1
+
         if(values[i][0]==idCount):
             tempHash[values[i][1]] = values[i][2]
         else:
-            data[values[i-1][0]] = tempHash
+            hashTrainData[values[i-1][0]] = tempHash
             tempHash = {}
             tempHash[values[i][1]] = values[i][2]
             idCount = values[i][0]
-    data[values[i][0]] = tempHash
-    #print(data)
+    hashTrainData[values[i][0]] = tempHash
+
+    for i in range(len(meanRows)):
+        if rowCount[i]>0:
+            meanRows[i] = meanRows[i]/rowCount[i]
+
+    for i in range(len(meanColumns)):
+        if columnsCount[i]>0:
+            meanColumns[i] = meanColumns[i]/columnsCount[i]
+    #print(meanRows, " ", meanColumns)
+    #print("Columns len: ", len(meanColumns), " ", len(tableTrainData[0]))
+
+    for i in range(len(tableTrainData)):
+        for j in range(len(tableTrainData[0])):
+            if tableTrainData[i][j]==0.0:
+                value = (meanRows[i]+meanColumns[j])/2.0
+                #print(value)
+                tableTrainData[i][j] = value
+    #For initialisation the average betwean mean Columns and Rows was found to be the best values to use.
+    #For a k=100 value and using the testHash set for u1
+    # Row avg:      1.01
+    # Column avg:   0.8573
+    # Mix avg:      0.793
+
+    # Create test hash table
+    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u1.test', sep='\t', names=r_cols,
+                          encoding='latin-1')
+    sortedRate = ratings.sort_values([('user_id')], ascending=True)
+    values = sortedRate.values
+
+    hashTestData = {}
+
+    idCount = values[0][0]
+
+    tempHash = {}
+
+    # A mapping algorithm might be needed if there are missing user ID's or movie ID's e.g. 1,2,3,5,6
+    for i in range(len(sortedRate)):
+        if (values[i][0] == idCount):
+            tempHash[values[i][1]] = values[i][2]
+        else:
+            hashTestData[values[i - 1][0]] = tempHash
+            tempHash = {}
+            tempHash[values[i][1]] = values[i][2]
+            idCount = values[i][0]
+    hashTestData[values[i][0]] = tempHash
 
 
+    return hashTrainData,tableTrainData,hashTestData
 
-    '''data = {
-        'Alan Perlis': {
-            'MovieA': 3.0,
-            'MovieB': 5.0,
-            'MovieC': 4.0,
-            'MovieD': 2.0
-        },
+def doNothing(data):
+    pass
 
-        'Dries Smit': {
-            'MovieA': 2.0,
-            'MovieB': 4.0,
-            'MovieC': 4.0,  # ,
-            'MovieD': 2.0
-        },
+def trainSVD(tableData):
+    user_ratings_mean = np.mean(tableData, axis=1)
+    R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
 
-        'Matthew Mcconaughey': {
-            'MovieA': 1.0,
-            'MovieB': 3.0,
-            'MovieC': 3.0,
-            'MovieD': 1.0
-        },
+    # Calculate the SVD
+    U, sigma, Vt = svds(R_demeaned, k=100)
+    sigma = np.diag(sigma)
 
-        'John Connor': {
-            'MovieA': 3.0,
-            'MovieB': 4.0,
-            'MovieC': 3.0,
-            'MovieD': 4.1,
-        },
-    }'''
+    model = []
 
-    return data
+    model.append(U)
+    model.append(sigma)
+    model.append(Vt)
+    model.append(user_ratings_mean)
+
+    return model
+
+
+def train(tableData,algs=['SVD']):
+    function_mappings = {
+        'SVD': trainSVD,
+    }
+
+    trainTime = np.zeros(len(algs))
+    models = []
+
+    for i, curAlg in enumerate(algs):
+        start = time.time()
+        if curAlg=='SVD':
+            print "Training ", curAlg,"..."
+            models.append(function_mappings[curAlg](tableData))
+        trainTime[i] += time.time() - start
+    print "Training done."
+    return trainTime,models
 
 # Not good if one person consistently rates more harsly
 def euclidean_similarity(data,person1, person2):
@@ -109,13 +181,14 @@ def pearson_similarity(data,person1, person2):
 
     return (num / den) if den != 0 else 0
 
-def average(data,person1, person2):
-
+def general_popularity(data,person1, person2):
     return 1.0
+
+def randomItem():
+    return random.random()
 
 def recommend(data,person, item,bound, similarity=pearson_similarity):
     scores = [(similarity(data,person, other), other) for other in data if other != person]
-
     scores.sort()
     scores.reverse()
     #print(scores)
@@ -141,50 +214,102 @@ def recommend(data,person, item,bound, similarity=pearson_similarity):
     # just add 0.0001 to sim to increase speed.
     return recomms
 
-def  evaluate(data,testPerAlg,algs=['euclidean_similarity','pearson_similarity']):
+def SVD(tableData,model,userID,itemID):
+    # Get and sort the user's predictions
+    U = model[0]
+    sigma = model[1]
+    Vt = model[2]
+    user_ratings_mean = model[3]
+
+    all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
+
+    userRate = all_user_predicted_ratings[userID]
+
+    #print "Real: ", tableData[userID]
+    #print "Prediction: ", userRate
+
+    #Maybe normalize the data
+    return userRate[itemID]
+
+def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_similarity']):
+    print("Testing algorithms:")
+
     function_mappings = {
         'euclidean_similarity': euclidean_similarity,
         'pearson_similarity'  : pearson_similarity,
-        'average': average,
+        'general_popularity': general_popularity,
+        'randomItem': randomItem,
+        'SVD': SVD,
     }
     #print("Value: ",data['Dries Smit']['MovieD'])
     results = np.zeros(len(algs))
-
+    runTime = np.zeros(len(algs))
     for test in range(testPerAlg):
 
         print "Percentage completed: ", round(test*100.0/testPerAlg,2), "%"
 
-        randMember = int((len(data) * random.random()))
-        memberName = data.keys()[randMember]
-        #print "Random member: ", memberName
-        randItem = int((len(data[memberName]) * random.random()))
-        itemName = data[memberName].keys()[randItem]
-        #print "Random item: ", itemName
+        memberIndex = int((len(data) * random.random()))
+        memberID = data.keys()[memberIndex]
+        #print "Member: ", memberIndex, " ", memberID
+        itemIndex = int((len(data[memberID]) * random.random()))
+        itemID = data[memberID].keys()[itemIndex]
+        #print "Item: ", itemIndex, " ", itemID
 
         #memberName = 'John Connor'
         #itemName = 'MovieB'
 
-
-        #Maak average algorithm reg dat hy nie BOUNDED IS NIE!!!!!!!!!!!!!!!!!!!
         for i,curAlg in enumerate(algs):
-            rec = recommend(data,memberName, itemName, 150, function_mappings[curAlg])
+            start = time.time()
+            limit = 150
+
+            if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="general_popularity":
+                if curAlg=="general_popularity":
+                    limit = len(data)
+
+                rec = recommend(data,memberID, itemID, limit, function_mappings[curAlg])
+            elif curAlg=="SVD":
+                rec = SVD(tableData,models[0], memberID-1, itemID-1)#toets deur om tableData in te vat en te kyk of dit decrease
+            elif curAlg=="randomItem":
+                rec = randomItem()
+            else:
+                print("Incorrect algorithm name entered.")
+            runTime[i] += time.time()-start
+
             # I don't think mean squared error is needed yet. But it is a good practice to implement when actually
             # using the system.
-            results[i] += abs(rec-data[memberName][itemName])
+            results[i] += abs(rec-data[memberID][itemID])
     results /= testPerAlg
-    return results
+    return results,runTime
 
-data = createData()
+hashData,tableData,testHashData = createData()
 
-algs = ['euclidean_similarity','pearson_similarity','average']
-result = evaluate(data,1000,algs=algs)
+algs = ['pearson_similarity','SVD','general_popularity']#['euclidean_similarity','pearson_similarity','general_popularity','SVD']
+
+trainTimes,models = train(tableData,algs=algs) #Train all the algorithms
+
+result,runTime = evaluate(testHashData,models,100,algs=algs) #Test all the algorithms  #Maak testHasData
 
 print "Results: ", result
 
 x = np.arange(len(algs))
+plt.figure("Score")
 plt.bar(x, height= result)
 plt.xticks(x+.4, algs)
 plt.title("Error in ratings for different algorithms(0 is best)")
 plt.xlabel("Algorithm used")
 plt.ylabel("Average error in ratings")
+
+plt.figure("Runtime")
+plt.bar(x, height= runTime)
+plt.xticks(x+.4, algs)
+plt.title("Run time for different algorithms(0 is best)")
+plt.xlabel("Algorithm used")
+plt.ylabel("Run time in seconds")
+
+plt.figure("Training time")
+plt.bar(x, height= trainTimes)
+plt.xticks(x+.4, algs)
+plt.title("Training time for each algorithm")
+plt.xlabel("Algorithm used")
+plt.ylabel("Training time in seconds")
 plt.show()
