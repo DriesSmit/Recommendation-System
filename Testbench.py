@@ -7,8 +7,39 @@ import time
 from scipy.sparse.linalg import svds
 
 #To do
+#1.) Implement this
+# https://stackoverflow.com/questions/18424228/cosine-similarity-between-2-number-lists
+def cosine_similarity(v1,v2):
+    "compute cosine similarity of v1 to v2: (v1 dot v2)/{||v1||*||v2||)"
+    sumxx, sumxy, sumyy = 0, 0, 0
+    for i in range(len(v1)):
+        x = v1[i]; y = v2[i]
+        sumxx += x*x
+        sumyy += y*y
+        sumxy += x*y
+    returnasdf sumxy/math.sqrt(sumxx*sumyy)
+
 #1.) Test on a bigger dataset
 #2.) Take each algrithm to there seperate classes
+#3.) Work on report with results
+
+
+
+#Comments
+#euclidean_similarity
+#--------------------
+# But works surprisingly well on the smaller datasets. This might be due to the almost consistent number of movies rated
+# Not good if one person consistently rates more harsly
+
+#pearson_similarity
+#------------------
+# This allows system finds stronger correlation even if one person rates is consistently harsher or kinder than the
+# other.
+# The system only considers commonly ranked items without a penalty for the amount of commonly ranked items.
+# This means a person with only two movies rated can significantly influence another persons recommendations.
+# The systems also scores perfect correlation if there is two or less commonly score items, which will have to be
+# compensated for.
+
 
 
 def createData():
@@ -24,7 +55,7 @@ def createData():
 
 
     #Create training hash and normal table
-    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u1.base', sep='\t', names=r_cols,
+    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u3.base', sep='\t', names=r_cols,
                           encoding='latin-1')
     sortedRate = ratings.sort_values([('user_id')], ascending=True)
     values = sortedRate.values
@@ -85,7 +116,7 @@ def createData():
     # Mix avg:      0.793
 
     # Create test hash table
-    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u1.test', sep='\t', names=r_cols,
+    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u3.test', sep='\t', names=r_cols,
                           encoding='latin-1')
     sortedRate = ratings.sort_values([('user_id')], ascending=True)
     values = sortedRate.values
@@ -148,7 +179,7 @@ def train(tableData,algs=['SVD']):
     print "Training done."
     return trainTime,models
 
-# Not good if one person consistently rates more harsly
+
 def euclidean_similarity(data,person1, person2):
 
 	common_ranked_items = [itm for itm in data[person1] if itm in data[person2]]
@@ -157,12 +188,7 @@ def euclidean_similarity(data,person1, person2):
 
 	return 1 / (1 + sum(distance))
 
-# This allows system finds stronger correlation even if one person rates is consistently harsher or kinder than the
-# other.
-# The system only considers commonly ranked items without a penalty for the amount of commonly ranked items.
-# This means a person with only two movies rated can significantly influence another persons recommendations.
-# The systems also scores perfect correlation if there is two or less commonly score items, which will have to be
-# compensated for.
+
 def pearson_similarity(data,person1, person2):
 
     common_ranked_items = [itm for itm in data[person1] if itm in data[person2]]
@@ -213,6 +239,16 @@ def recommend(data,person, item,bound, similarity=pearson_similarity):
     recomms = weight / sim if sim!=0.0 else 2.5  # This is a extremely unlikely event of zero correlation found. Maybe
     # just add 0.0001 to sim to increase speed.
     return recomms
+
+'''def cosine_similarity(v1,v2):
+    "compute cosine similarity of v1 to v2: (v1 dot v2)/{||v1||*||v2||)"
+    sumxx, sumxy, sumyy = 0, 0, 0
+    for i in range(len(v1)):
+        x = v1[i]; y = v2[i]
+        sumxx += x*x
+        sumyy += y*y
+        sumxy += x*y
+    return sumxy/math.sqrt(sumxx*sumyy)'''
 
 def SVD(tableData,model,userID,itemID):
     # Get and sort the user's predictions
@@ -277,13 +313,17 @@ def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_simil
 
             # I don't think mean squared error is needed yet. But it is a good practice to implement when actually
             # using the system.
+
+            if curAlg=="euclidean_similarity":
+                print("Alg rec: ",rec,". True ans: ",data[memberID][itemID])
+
             results[i] += abs(rec-data[memberID][itemID])
     results /= testPerAlg
     return results,runTime
 
 hashData,tableData,testHashData = createData()
 
-algs = ['pearson_similarity','SVD','general_popularity']#['euclidean_similarity','pearson_similarity','general_popularity','SVD']
+algs = ['pearson_similarity','SVD','general_popularity','euclidean_similarity']#['euclidean_similarity','pearson_similarity','general_popularity','SVD']
 
 trainTimes,models = train(tableData,algs=algs) #Train all the algorithms
 
