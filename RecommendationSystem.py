@@ -75,7 +75,7 @@ def trainSVD(tableData):
     R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
 
     # Calculate the SVD
-    U, sigma, Vt = svds(R_demeaned, k=100)
+    U, sigma, Vt = svds(R_demeaned, k=30)
     sigma = np.diag(sigma)
 
     model = []
@@ -148,6 +148,9 @@ def cosine_similarity(data,person1,person2):
     return ans
 
 def recommend(data,person, item,bound, similarity=pearson_similarity):
+
+    #print(person)
+
     scores = [(similarity(data,person, other), other) for other in data if other != person]
     scores.sort()
     scores.reverse()
@@ -174,7 +177,7 @@ def recommend(data,person, item,bound, similarity=pearson_similarity):
     # just add 0.0001 to sim to increase speed.
     return recomms
 
-def general_popularity(data,person, item):
+def general_popularity(data, item):
 
     meanScore = 0.0
     meanCount = 0
@@ -194,7 +197,7 @@ def general_popularity(data,person, item):
 def randomItem():
     return random.random()
 
-def SVD(tableData,model,userID,itemID):
+def SVD(model,userID,itemID):
     # Get and sort the user's predictions
     U = model[0]
     sigma = model[1]

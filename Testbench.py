@@ -9,8 +9,7 @@ import RecommendationSystem as rs
 #2.) Take each algrithm to there seperate classes
 #3.) Work on report with results
 
-
-def createData(size=1):
+def createOldData():
     r_cols = ['user_id', 'movie_id', 'rating', 'unix_timestamp']
     numUsers = 0
     numMovies = 0
@@ -72,10 +71,67 @@ def createData(size=1):
             idCount = values[i][0]
     hashTestData[values[i][0]] = tempHash
 
+    return hashTrainData,tableTrainData,hashTestData
+
+def createData(ratingsLoc,userLoc,movieLoc,seperator):
+    r_cols = ['user_id', 'movie_id', 'rating', 'unix_timestamp']
+    numUsers = 0
+    numMovies = 0
+
+    train_test_ratio = 0.8 # 0.8 = 80% training data and 20% test data
+
+    # Count users
+    with open(userLoc) as myfile:
+        numUsers = sum(1 for line in myfile)
+
+    # Count movies
+    with open(movieLoc) as myfile:
+        numMovies = sum(1 for line in myfile)
+
+
+    #Create training hash and normal table
+    ratings = pd.read_csv(ratingsLoc, sep=seperator, names=r_cols,
+                          encoding='latin-1')
+    sortedRate = ratings.sort_values([('user_id')], ascending=True)
+    values = sortedRate.values
+
+    hashTrainData = {}
+
+    idCount = values[0][0]
+
+    tempHash = {}
+
+    tableTrainData = np.zeros((numUsers, numMovies))#Initialize any value not known to 2.5
+
+    #A mapping algorithm might be needed if there are missing user ID's or movie ID's e.g. 1,2,3,5,6
+    for i in range(int(len(sortedRate)*train_test_ratio)):
+        tableTrainData[values[i][0]-1][values[i][1]-1] = values[i][2]
+
+        if(values[i][0]==idCount):
+            tempHash[values[i][1]] = values[i][2]
+        else:
+            hashTrainData[values[i-1][0]] = tempHash
+            tempHash = {}
+            tempHash[values[i][1]] = values[i][2]
+            idCount = values[i][0]
+    hashTrainData[values[i][0]] = tempHash
+
+    hashTestData = {}
+    idCount = values[int(len(sortedRate)*train_test_ratio)][0]
+    tempHash = {}
+    for i in range(int(len(sortedRate)*train_test_ratio),len(sortedRate)): # Maybe
+        if(values[i][0]==idCount):
+            tempHash[values[i][1]] = values[i][2]
+        else:
+            hashTestData[values[i-1][0]] = tempHash
+            tempHash = {}
+            tempHash[values[i][1]] = values[i][2]
+            idCount = values[i][0]
+    hashTestData[values[i][0]] = tempHash
 
     return hashTrainData,tableTrainData,hashTestData
 
-def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_similarity']):
+def  evaluate(trainHashData,trainingTableData,testHasData,models,testPerAlg,algs=['euclidean_similarity','pearson_similarity']):
     print("Testing algorithms:")
 
     function_mappings = {
@@ -93,11 +149,11 @@ def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_simil
 
         print "Percentage completed: ", round(test*100.0/testPerAlg,2), "%"
 
-        memberIndex = int((len(data) * random.random()))
-        memberID = data.keys()[memberIndex]
+        memberIndex = int((len(testHasData) * random.random()))
+        memberID = testHasData.keys()[memberIndex]
         #print "Member: ", memberIndex, " ", memberID
-        itemIndex = int((len(data[memberID]) * random.random()))
-        itemID = data[memberID].keys()[itemIndex]
+        itemIndex = int((len(testHasData[memberID]) * random.random()))
+        itemID = testHasData[memberID].keys()[itemIndex]
         #print "Item: ", itemIndex, " ", itemID
 
         #memberName = 'John Connor'
@@ -106,13 +162,13 @@ def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_simil
         for i,curAlg in enumerate(algs):
             start = time.time()
             limit = 150
-
+            #print(trainData)
             if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="cosine_similarity":
-                rec = rs.recommend(data,memberID, itemID, limit, function_mappings[curAlg])
+                rec = rs.recommend(trainHashData,memberID, itemID, limit, function_mappings[curAlg])
             elif curAlg=="general_popularity":
-                rec = rs.general_popularity(tableData,memberID-1, itemID-1)
+                rec = rs.general_popularity(trainingTableData, itemID-1)
             elif curAlg=="SVD":
-                rec = rs.SVD(tableData,models[0], memberID-1, itemID-1)#toets deur om tableData in te vat en te kyk of dit decrease
+                rec = rs.SVD(models[0], memberID-1, itemID-1)#toets deur om tableData in te vat en te kyk of dit decrease
             elif curAlg=="randomItem":
                 rec = rs.randomItem()
             else:
@@ -125,17 +181,22 @@ def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_simil
             '''if curAlg=="euclidean_similarity":
                 print("Alg rec: ",rec,". True ans: ",data[memberID][itemID])'''
 
-            results[i] += abs(rec-data[memberID][itemID])
+            results[i] += abs(rec-testHasData[memberID][itemID])
     results /= testPerAlg
     return results,runTime
 
-hashData,tableData,testHashData = createData()
+ratingsFile = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u.data'
+userLocation = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u.user'
+movieLocation = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u.item'
+
+#trainHashData, trainTableData,testHashData = createData(ratingsFile,userLocation,movieLocation,seperator='\t')
+trainHashData, trainTableData,testHashData = createOldData()
 
 algs = ['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']#['euclidean_similarity','pearson_similarity','general_popularity','SVD']
 
-trainTimes,models = rs.train(tableData,algs=algs) #Train all the algorithms
+trainTimes,models = rs.train(trainTableData,algs=algs) #Train all the algorithms
 
-result,runTime = evaluate(testHashData,models,100,algs=algs) #Test all the algorithms
+result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,500,algs=algs) #Test all the algorithms
 
 print "Results: ", result
 
