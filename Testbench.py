@@ -72,19 +72,30 @@ def createOldData():
     return hashTrainData,tableTrainData,hashTestData
 
 def createData(ratingsLoc,userLoc,movieLoc,seperator):
+    print("Loading dataset...")
     r_cols = ['user_id', 'movie_id', 'rating', 'unix_timestamp']
     numUsers = 0
     numMovies = 0
 
     train_test_ratio = 0.9 # 0.8 = 80% training data and 20% test data
 
-    # Count users
+    # Count users and build map
+    numUsers = 0
+    userMap = {}
     with open(userLoc) as myfile:
-        numUsers = sum(1 for line in myfile)
+        for aline in myfile.readlines():
+            values = aline.split("::")
+            userMap[int(values[0])] = numUsers
+            numUsers += 1
 
-    # Count movies
+    # Count movies and build map
+    numMovies = 0
+    movieMap = {}
     with open(movieLoc) as myfile:
-        numMovies = sum(1 for line in myfile)
+        for aline in myfile.readlines():
+            values = aline.split("::")
+            movieMap[int(values[0])] = numMovies
+            numMovies += 1
 
 
     #Create training hash and normal table
@@ -100,6 +111,7 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator):
 
     tempTrainHash = {}
     tempTestHash = {}
+    #numMovies = 3952 #Hard hack
     tableTrainData = np.zeros((numUsers, numMovies))#Initialize any value not known to 2.5
 
     takeRate = int(1.0/(1.0-train_test_ratio))
@@ -107,7 +119,7 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator):
     trainCount = 0
     #A mapping algorithm might be needed if there are missing user ID's or movie ID's e.g. 1,2,3,5,6
     for i in range(len(sortedRate)):
-        tableTrainData[values[i][0]-1][values[i][1]-1] = values[i][2]
+        tableTrainData[userMap[values[i][0]]][movieMap[values[i][1]]] = values[i][2]
 
         if(values[i][0]==idCount):
             if i%takeRate>0:
@@ -131,15 +143,15 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator):
             idCount = values[i][0]
     hashTrainData[values[i][0]] = tempTrainHash
     tempTestHash[values[i][0]] = tempTestHash
-
-    print "All data: ",len(sortedRate),". TrainCount: ",trainCount, ". TestCount: ",testCount
+    print "Number of users: ", numUsers, ". Number of movies: ",numMovies
+    print "Number of ratings: ",len(sortedRate),". Number of training ratings: ",trainCount, ". Number of test ratings: ",testCount
 
     #print(hashTrainData)
     #print(hashTestData)
 
-    return hashTrainData,tableTrainData,hashTestData
+    return hashTrainData,tableTrainData,hashTestData,userMap,movieMap
 
-def  evaluate(trainHashData,trainingTableData,testHasData,models,testPerAlg,algs=['euclidean_similarity','pearson_similarity']):
+def  evaluate(trainHashData,trainingTableData,testHasData,models,userMap,movieMap,testPerAlg,algs=['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']):
     print("Testing algorithms:")
 
     function_mappings = {
@@ -174,9 +186,9 @@ def  evaluate(trainHashData,trainingTableData,testHasData,models,testPerAlg,algs
             if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="cosine_similarity":
                 rec = rs.recommend(trainHashData,memberID, itemID, limit, function_mappings[curAlg])
             elif curAlg=="general_popularity":
-                rec = rs.general_popularity(trainingTableData, itemID-1)
+                rec = rs.general_popularity(trainingTableData,movieMap, itemID-1)
             elif curAlg=="SVD":
-                rec = rs.SVD(models[0], memberID-1, itemID-1)#toets deur om tableData in te vat en te kyk of dit decrease
+                rec = rs.SVD(models[0],userMap,movieMap, memberID, itemID)#toets deur om tableData in te vat en te kyk of dit decrease
             elif curAlg=="randomItem":
                 rec = rs.randomItem()
             else:
@@ -194,26 +206,26 @@ def  evaluate(trainHashData,trainingTableData,testHasData,models,testPerAlg,algs
     return results,runTime
 
 # Database of 1m
-'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
+dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
 ratingsFile = dir + 'ratings.dat'
 userLocation = dir + 'users.dat'
 movieLocation = dir + 'movies.dat'
-sep = '::'''
+sep = '::'
 
 # Database of 100k
-dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
+'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
 ratingsFile = dir + 'u.data'
 userLocation = dir + 'u.user'
 movieLocation = dir + 'u.item'
-sep = '\t'
+sep = '\t'''
 
-trainHashData, trainTableData,testHashData = createData(ratingsFile,userLocation,movieLocation,seperator=sep)
+trainHashData, trainTableData,testHashData,userMap,movieMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep)
 #trainHashData, trainTableData,testHashData = createOldData()
 
 algs = ['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity']#['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 trainTimes,models = rs.train(trainTableData,algs=algs) #Train all the algorithms
 
-result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,500,algs=algs) #Test all the algorithms
+result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,100,algs=algs) #Test all the algorithms
 
 print "Results: ", result
 

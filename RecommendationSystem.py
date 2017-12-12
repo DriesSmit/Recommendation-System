@@ -7,25 +7,9 @@ import time
 from scipy.sparse.linalg import svds
 
 #Comments
-#euclidean_similarity
-#--------------------
-# Works surprisingly well on the smaller datasets. This might be due to the almost consistent number of movies rated
-# Not good if one person consistently rates harsher than a other person.
+#Please refer to Report.odt for a more detailed explanation and result page
+#of each algorithm
 
-#pearson_similarity
-#------------------
-# This allows the system to find stronger correlation even if one person rates consistently harsher or kinder than the
-# other.
-# The system only considers commonly ranked items without a penalty for the amount of commonly ranked items.
-# This means a person with only two movies rated can significantly influence another persons recommendations.
-# The systems also scores perfect correlation if there is two or less commonly score items, which will have to be
-# compensated for.
-
-#SVD
-#---
-#When the unknown table values is initialised to 0 the SVD generalises badly. The inisial values are now set to the
-#average of both the movie and user average ratings. This new SVD model is much more accurate. From 2.96 to 0.8 accuracy.
-#Using a training set of 90 000 entries the SVD has a test accuracy of 0.63 with the second best being 0.84.
 def doNothing(data):
     pass
 
@@ -184,14 +168,14 @@ def recommend(data,person, item,bound, similarity=pearson_similarity):
     # just add 0.0001 to sim to increase speed.
     return recomms
 
-def general_popularity(data, item):
+def general_popularity(data,movieMap, item):
 
     meanScore = 0.0
     meanCount = 0
 
     for i in range(len(data)):
 
-        curScore = data[i][item]
+        curScore = data[i][movieMap[item]]
 
         if curScore != 0:
             meanScore += curScore
@@ -204,7 +188,7 @@ def general_popularity(data, item):
 def randomItem():
     return random.random()
 
-def SVD(model,userID,itemID):
+def SVD(model,userMap,movieMap,userID,itemID):
     # Get and sort the user's predictions
     U = model[0]
     sigma = model[1]
@@ -213,11 +197,4 @@ def SVD(model,userID,itemID):
 
     all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
 
-    userRate = all_user_predicted_ratings[userID]
-
-    #print "Real: ", tableData[userID]
-    #print "Prediction: ", userRate
-
-    #Maybe normalize the data
-    return userRate[itemID]
-
+    return all_user_predicted_ratings[userMap[userID]][movieMap[itemID]]
