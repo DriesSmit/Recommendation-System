@@ -4,11 +4,9 @@ import random
 import pandas as pd
 import time
 import RecommendationSystem as rs
-#1.) Create Testbench, RecommendationSystem
 #1.) Test on a bigger dataset
-#2.) Take each algrithm to there seperate classes
-#3.) Work on report with results
-
+#2.) Work on report with results
+#3.) Try bigger machine leaning algorithm
 def createOldData():
     r_cols = ['user_id', 'movie_id', 'rating', 'unix_timestamp']
     numUsers = 0
@@ -78,7 +76,7 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator):
     numUsers = 0
     numMovies = 0
 
-    train_test_ratio = 0.8 # 0.8 = 80% training data and 20% test data
+    train_test_ratio = 0.9 # 0.8 = 80% training data and 20% test data
 
     # Count users
     with open(userLoc) as myfile:
@@ -96,38 +94,48 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator):
     values = sortedRate.values
 
     hashTrainData = {}
+    hashTestData = {}
 
     idCount = values[0][0]
 
-    tempHash = {}
-
+    tempTrainHash = {}
+    tempTestHash = {}
     tableTrainData = np.zeros((numUsers, numMovies))#Initialize any value not known to 2.5
 
+    takeRate = int(1.0/(1.0-train_test_ratio))
+    testCount = 0
+    trainCount = 0
     #A mapping algorithm might be needed if there are missing user ID's or movie ID's e.g. 1,2,3,5,6
-    for i in range(int(len(sortedRate)*train_test_ratio)):
+    for i in range(len(sortedRate)):
         tableTrainData[values[i][0]-1][values[i][1]-1] = values[i][2]
 
         if(values[i][0]==idCount):
-            tempHash[values[i][1]] = values[i][2]
+            if i%takeRate>0:
+                tempTrainHash[values[i][1]] = values[i][2]
+                trainCount +=1
+            else:
+                tempTestHash[values[i][1]] = values[i][2]
+                testCount += 1
         else:
-            hashTrainData[values[i-1][0]] = tempHash
-            tempHash = {}
-            tempHash[values[i][1]] = values[i][2]
-            idCount = values[i][0]
-    hashTrainData[values[i][0]] = tempHash
+            hashTrainData[values[i-1][0]] = tempTrainHash
+            hashTestData[values[i - 1][0]] = tempTestHash
+            tempTrainHash = {}
+            tempTestHash = {}
+            if i%takeRate>0:
+                tempTrainHash[values[i][1]] = values[i][2]
+                trainCount += 1
+            else:
+                tempTestHash[values[i][1]] = values[i][2]
+                testCount += 1
 
-    hashTestData = {}
-    idCount = values[int(len(sortedRate)*train_test_ratio)][0]
-    tempHash = {}
-    for i in range(int(len(sortedRate)*train_test_ratio),len(sortedRate)): # Maybe
-        if(values[i][0]==idCount):
-            tempHash[values[i][1]] = values[i][2]
-        else:
-            hashTestData[values[i-1][0]] = tempHash
-            tempHash = {}
-            tempHash[values[i][1]] = values[i][2]
             idCount = values[i][0]
-    hashTestData[values[i][0]] = tempHash
+    hashTrainData[values[i][0]] = tempTrainHash
+    tempTestHash[values[i][0]] = tempTestHash
+
+    print "All data: ",len(sortedRate),". TrainCount: ",trainCount, ". TestCount: ",testCount
+
+    #print(hashTrainData)
+    #print(hashTestData)
 
     return hashTrainData,tableTrainData,hashTestData
 
@@ -185,15 +193,24 @@ def  evaluate(trainHashData,trainingTableData,testHasData,models,testPerAlg,algs
     results /= testPerAlg
     return results,runTime
 
-ratingsFile = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u.data'
-userLocation = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u.user'
-movieLocation = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u.item'
+# Database of 1m
+'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
+ratingsFile = dir + 'ratings.dat'
+userLocation = dir + 'users.dat'
+movieLocation = dir + 'movies.dat'
+sep = '::'''
 
-#trainHashData, trainTableData,testHashData = createData(ratingsFile,userLocation,movieLocation,seperator='\t')
-trainHashData, trainTableData,testHashData = createOldData()
+# Database of 100k
+dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
+ratingsFile = dir + 'u.data'
+userLocation = dir + 'u.user'
+movieLocation = dir + 'u.item'
+sep = '\t'
 
-algs = ['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']#['euclidean_similarity','pearson_similarity','general_popularity','SVD']
+trainHashData, trainTableData,testHashData = createData(ratingsFile,userLocation,movieLocation,seperator=sep)
+#trainHashData, trainTableData,testHashData = createOldData()
 
+algs = ['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity']#['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 trainTimes,models = rs.train(trainTableData,algs=algs) #Train all the algorithms
 
 result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,500,algs=algs) #Test all the algorithms
