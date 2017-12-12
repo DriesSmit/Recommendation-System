@@ -9,22 +9,68 @@ from scipy.sparse.linalg import svds
 #Comments
 #euclidean_similarity
 #--------------------
-# But works surprisingly well on the smaller datasets. This might be due to the almost consistent number of movies rated
-# Not good if one person consistently rates more harsly
+# Works surprisingly well on the smaller datasets. This might be due to the almost consistent number of movies rated
+# Not good if one person consistently rates harsher than a other person.
 
 #pearson_similarity
 #------------------
-# This allows system finds stronger correlation even if one person rates is consistently harsher or kinder than the
+# This allows the system to find stronger correlation even if one person rates consistently harsher or kinder than the
 # other.
 # The system only considers commonly ranked items without a penalty for the amount of commonly ranked items.
 # This means a person with only two movies rated can significantly influence another persons recommendations.
 # The systems also scores perfect correlation if there is two or less commonly score items, which will have to be
 # compensated for.
 
+#SVD
+#---
+#This algorithm is initialized
 def doNothing(data):
     pass
 
 def trainSVD(tableData):
+
+    # Adding data to missing entries to better generalise
+
+    # For initialisation the average between mean Columns and Rows was found to be the best values to use.
+    # For a k=100 value and using the testHash set for u1
+    # Row avg:      1.01
+    # Column avg:   0.8573
+    # Mix avg:      0.793
+
+    meanRows = np.zeros(len(tableData))
+    meanColumns = np.zeros(len(tableData[0]))
+    rowCount = np.zeros(len(tableData))
+    columnsCount = np.zeros(len(tableData[0]))
+
+    for i in range(len(tableData)):
+        for j in range(len(tableData[0])):
+            if tableData[i][j] != 0.0:
+
+                meanRows[i] += tableData[i][j]
+                rowCount[i] += 1
+
+                meanColumns[j] += tableData[i][j]
+                columnsCount[j] += 1
+
+    for i in range(len(meanRows)):
+        if rowCount[i] > 0:
+            meanRows[i] = meanRows[i] / rowCount[i]
+
+    for i in range(len(meanColumns)):
+        if columnsCount[i] > 0:
+            meanColumns[i] = meanColumns[i] / columnsCount[i]
+    #print(meanRows, " ", meanColumns)
+    #print("Columns len: ", len(meanColumns), " ", len(tableData[0]))
+
+    for i in range(len(tableData)):
+        for j in range(len(tableData[0])):
+            if tableData[i][j] == 0.0:
+                value = (meanRows[i] + meanColumns[j]) / 2.0
+                # print(value)
+                tableData[i][j] = value
+
+    # Demean data
+
     user_ratings_mean = np.mean(tableData, axis=1)
     R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
 

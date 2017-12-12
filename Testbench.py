@@ -37,20 +37,8 @@ def createData(size=1):
     tableTrainData = np.zeros((numUsers, numMovies))#Initialize any value not known to 2.5
 
     #A mapping algorithm might be needed if there are missing user ID's or movie ID's e.g. 1,2,3,5,6
-
-    meanRows = np.zeros(len(tableTrainData))
-    meanColumns = np.zeros(len(tableTrainData[0]))
-    rowCount = np.zeros(len(tableTrainData))
-    columnsCount = np.zeros(len(tableTrainData[0]))
-
     for i in range(len(sortedRate)):
         tableTrainData[values[i][0]-1][values[i][1]-1] = values[i][2]
-
-        meanRows[values[i][0]-1] += values[i][2]
-        rowCount[values[i][0]-1] += 1
-
-        meanColumns[values[i][1] - 1] += values[i][2]
-        columnsCount[values[i][1] - 1] += 1
 
         if(values[i][0]==idCount):
             tempHash[values[i][1]] = values[i][2]
@@ -60,28 +48,6 @@ def createData(size=1):
             tempHash[values[i][1]] = values[i][2]
             idCount = values[i][0]
     hashTrainData[values[i][0]] = tempHash
-
-    for i in range(len(meanRows)):
-        if rowCount[i]>0:
-            meanRows[i] = meanRows[i]/rowCount[i]
-
-    for i in range(len(meanColumns)):
-        if columnsCount[i]>0:
-            meanColumns[i] = meanColumns[i]/columnsCount[i]
-    #print(meanRows, " ", meanColumns)
-    #print("Columns len: ", len(meanColumns), " ", len(tableTrainData[0]))
-
-    for i in range(len(tableTrainData)):
-        for j in range(len(tableTrainData[0])):
-            if tableTrainData[i][j]==0.0:
-                value = (meanRows[i]+meanColumns[j])/2.0
-                #print(value)
-                tableTrainData[i][j] = value
-    #For initialisation the average betwean mean Columns and Rows was found to be the best values to use.
-    #For a k=100 value and using the testHash set for u1
-    # Row avg:      1.01
-    # Column avg:   0.8573
-    # Mix avg:      0.793
 
     # Create test hash table
     ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u1.test', sep='\t', names=r_cols,
@@ -141,16 +107,16 @@ def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_simil
             start = time.time()
             limit = 150
 
-            if curAlg=="euclidean_similarity" or curAlg=="cosine_similarity":
+            if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="cosine_similarity":
                 rec = rs.recommend(data,memberID, itemID, limit, function_mappings[curAlg])
-            elif curAlg=="pearson_similarity":
+            elif curAlg=="general_popularity":
                 rec = rs.general_popularity(tableData,memberID-1, itemID-1)
             elif curAlg=="SVD":
                 rec = rs.SVD(tableData,models[0], memberID-1, itemID-1)#toets deur om tableData in te vat en te kyk of dit decrease
             elif curAlg=="randomItem":
                 rec = rs.randomItem()
             else:
-                print("Incorrect algorithm name entered.")
+                print "Incorrect algorithm name entered: ",curAlg
             runTime[i] += time.time()-start
 
             # I don't think mean squared error is needed yet. But it is a good practice to implement when actually
