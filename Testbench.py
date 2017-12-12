@@ -6,24 +6,9 @@ import pandas as pd
 import time
 from scipy.sparse.linalg import svds
 
-#To do
-#1.) Implement this
-# https://stackoverflow.com/questions/18424228/cosine-similarity-between-2-number-lists
-def cosine_similarity(v1,v2):
-    "compute cosine similarity of v1 to v2: (v1 dot v2)/{||v1||*||v2||)"
-    sumxx, sumxy, sumyy = 0, 0, 0
-    for i in range(len(v1)):
-        x = v1[i]; y = v2[i]
-        sumxx += x*x
-        sumyy += y*y
-        sumxy += x*y
-    returnasdf sumxy/math.sqrt(sumxx*sumyy)
-
 #1.) Test on a bigger dataset
 #2.) Take each algrithm to there seperate classes
 #3.) Work on report with results
-
-
 
 #Comments
 #euclidean_similarity
@@ -55,7 +40,7 @@ def createData():
 
 
     #Create training hash and normal table
-    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u3.base', sep='\t', names=r_cols,
+    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u1.base', sep='\t', names=r_cols,
                           encoding='latin-1')
     sortedRate = ratings.sort_values([('user_id')], ascending=True)
     values = sortedRate.values
@@ -116,7 +101,7 @@ def createData():
     # Mix avg:      0.793
 
     # Create test hash table
-    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u3.test', sep='\t', names=r_cols,
+    ratings = pd.read_csv('/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/u1.test', sep='\t', names=r_cols,
                           encoding='latin-1')
     sortedRate = ratings.sort_values([('user_id')], ascending=True)
     values = sortedRate.values
@@ -207,6 +192,23 @@ def pearson_similarity(data,person1, person2):
 
     return (num / den) if den != 0 else 0
 
+def cosine_similarity(data,person1,person2):
+    common_ranked_items = [itm for itm in data[person1] if itm in data[person2]]
+
+    "compute cosine similarity of v1 to v2: (v1 dot v2)/{||v1||*||v2||)"
+    sumxx = sum([pow(data[person1][item], 2) for item in common_ranked_items])
+    sumyy = sum([pow(data[person2][item], 2) for item in common_ranked_items])
+    sumxy = sum([data[person1][item]*data[person2][item] for item in common_ranked_items])
+
+    #print sumxx, " ",sumyy," ",sumxy
+
+    den = math.sqrt(sumxx * sumyy)
+
+    ans = sumxy / den if den != 0.0 else 0.0
+
+    #print"Here:", ans
+    return ans
+
 def general_popularity(data,person1, person2):
     return 1.0
 
@@ -240,16 +242,6 @@ def recommend(data,person, item,bound, similarity=pearson_similarity):
     # just add 0.0001 to sim to increase speed.
     return recomms
 
-'''def cosine_similarity(v1,v2):
-    "compute cosine similarity of v1 to v2: (v1 dot v2)/{||v1||*||v2||)"
-    sumxx, sumxy, sumyy = 0, 0, 0
-    for i in range(len(v1)):
-        x = v1[i]; y = v2[i]
-        sumxx += x*x
-        sumyy += y*y
-        sumxy += x*y
-    return sumxy/math.sqrt(sumxx*sumyy)'''
-
 def SVD(tableData,model,userID,itemID):
     # Get and sort the user's predictions
     U = model[0]
@@ -274,6 +266,7 @@ def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_simil
         'euclidean_similarity': euclidean_similarity,
         'pearson_similarity'  : pearson_similarity,
         'general_popularity': general_popularity,
+        'cosine_similarity': cosine_similarity,
         'randomItem': randomItem,
         'SVD': SVD,
     }
@@ -298,7 +291,7 @@ def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_simil
             start = time.time()
             limit = 150
 
-            if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="general_popularity":
+            if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="general_popularity" or curAlg=="cosine_similarity":
                 if curAlg=="general_popularity":
                     limit = len(data)
 
@@ -323,7 +316,7 @@ def  evaluate(data,models,testPerAlg,algs=['euclidean_similarity','pearson_simil
 
 hashData,tableData,testHashData = createData()
 
-algs = ['pearson_similarity','SVD','general_popularity','euclidean_similarity']#['euclidean_similarity','pearson_similarity','general_popularity','SVD']
+algs = ['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']#['euclidean_similarity','pearson_similarity','general_popularity','SVD']
 
 trainTimes,models = train(tableData,algs=algs) #Train all the algorithms
 
