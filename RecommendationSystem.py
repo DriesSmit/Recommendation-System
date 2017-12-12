@@ -13,7 +13,7 @@ from scipy.sparse.linalg import svds
 def doNothing(data):
     pass
 
-def trainSVD(tableData):
+def trainSVD(data):
 
     # Adding data to missing entries to better generalise
 
@@ -22,14 +22,23 @@ def trainSVD(tableData):
     # Row avg:      1.01
     # Column avg:   0.8573
     # Mix avg:      0.793
+    #print("Copying table..")
+    tableData = data.copy()
+
+    #print("Adding addition values into table...")
 
     meanRows = np.zeros(len(tableData))
     meanColumns = np.zeros(len(tableData[0]))
     rowCount = np.zeros(len(tableData))
     columnsCount = np.zeros(len(tableData[0]))
-
+    #check = 0
     for i in range(len(tableData)):
         for j in range(len(tableData[0])):
+
+            '''if i*len(tableData[0]) + j > check:
+                check += len(tableData)*len(tableData[0])*0.0001
+                print "Percentage completed: ", round(i * 100.0 / (len(tableData)*len(tableData[0])), 5), "%"'''
+
             if tableData[i][j] != 0.0:
 
                 meanRows[i] += tableData[i][j]
@@ -37,7 +46,7 @@ def trainSVD(tableData):
 
                 meanColumns[j] += tableData[i][j]
                 columnsCount[j] += 1
-
+    print("Almost there...")
     for i in range(len(meanRows)):
         if rowCount[i] > 0:
 
@@ -53,7 +62,7 @@ def trainSVD(tableData):
                 meanColumns[i] = meanColumns[i] / columnsCount[i]
             else:
                 meanColumns[i] = 0.0 #<-- Don't recommend movie if now ratings has been given yet
-
+    #print("Adding now...")
     for i in range(len(tableData)):
         for j in range(len(tableData[0])):
             if tableData[i][j] == 0.0:
@@ -61,22 +70,19 @@ def trainSVD(tableData):
                 tableData[i][j] = value
 
     # De-mean data
-
+    #print("De-meaning data...")
     user_ratings_mean = np.mean(tableData, axis=1)
     R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
+
+    #print("Calculating SVD...")
 
     # Calculate the SVD
     U, sigma, Vt = svds(R_demeaned, k=40)
     sigma = np.diag(sigma)
 
-    model = []
+    all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
 
-    model.append(U)
-    model.append(sigma)
-    model.append(Vt)
-    model.append(user_ratings_mean)
-
-    return model
+    return all_user_predicted_ratings
 
 def train(tableData,algs=['SVD']):
     function_mappings = {
@@ -190,11 +196,6 @@ def randomItem():
 
 def SVD(model,userMap,movieMap,userID,itemID):
     # Get and sort the user's predictions
-    U = model[0]
-    sigma = model[1]
-    Vt = model[2]
-    user_ratings_mean = model[3]
 
-    all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
 
-    return all_user_predicted_ratings[userMap[userID]][movieMap[itemID]]
+    return model[userMap[userID]][movieMap[itemID]]
