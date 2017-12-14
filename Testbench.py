@@ -4,9 +4,8 @@ import random
 import pandas as pd
 import time
 import RecommendationSystem as rs
-#1.) Test on a bigger dataset
-#2.) Work on report with results
-#3.) Try bigger machine leaning algorithm
+#1.) Test on hiGuru type of dataset.
+#3.) Also test on link type of dataset.
 def createOldData():
     r_cols = ['user_id', 'movie_id', 'rating', 'unix_timestamp']
     numUsers = 0
@@ -121,10 +120,10 @@ def createData20ml(ratingsLoc,movieLoc):
 
         if(values[i][0]==idCount):
             if i%takeRate>0:
-                tempTrainHash[int(values[i][1])] = values[i][2]
+                tempTrainHash[int(values[i][1])] = float(values[i][2])
                 trainCount +=1
             else:
-                tempTestHash[int(values[i][1])] = values[i][2]
+                tempTestHash[int(values[i][1])] = float(values[i][2])
                 testCount += 1
         else:
             userMap[int(values[i][0])] = numUsers
@@ -134,17 +133,17 @@ def createData20ml(ratingsLoc,movieLoc):
             tempTrainHash = {}
             tempTestHash = {}
             if i%takeRate>0:
-                tempTrainHash[int(values[i][1])] = values[i][2]
+                tempTrainHash[int(values[i][1])] = float(values[i][2])
                 trainCount += 1
             else:
-                tempTestHash[int(values[i][1])] = values[i][2]
+                tempTestHash[int(values[i][1])] = float(values[i][2])
                 testCount += 1
 
             idCount = values[i][0]
         if i % takeRate > 0:
             tableTrainData[userMap[int(values[i][0])]][movieMap[int(values[i][1])]] = values[i][2]
     hashTrainData[int(values[i][0])] = tempTrainHash
-    tempTestHash[int(values[i][0])] = tempTestHash
+    hashTestData[int(values[i][0])] = tempTestHash
 
     print "Number of users: ", numUsers, ". Number of movies: ",numMovies
     print "Number of ratings: ",len(sortedRate),". Number of training ratings: ",trainCount, ". Number of test ratings: ",testCount
@@ -232,7 +231,7 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator):
 
     return hashTrainData,tableTrainData,hashTestData,userMap,movieMap
 
-def  evaluate(trainHashData,trainingTableData,testHasData,models,userMap,movieMap,testPerAlg,algs=['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']):
+def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,testPerAlg,algs=['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']):
     print("Testing algorithms:")
 
     function_mappings = {
@@ -252,13 +251,14 @@ def  evaluate(trainHashData,trainingTableData,testHasData,models,userMap,movieMa
 
         memberIndex = int((len(testHasData) * random.random()))
         memberID = testHasData.keys()[memberIndex]
-        #print "Member: ", memberIndex, " ", memberID
+        while len(testHasData[memberID])==0:
+            memberIndex = int((len(testHasData) * random.random()))
+            memberID = testHasData.keys()[memberIndex]
+
         itemIndex = int((len(testHasData[memberID]) * random.random()))
+        #print itemIndex, " ",int((len(testHasData[memberID])))
         itemID = testHasData[memberID].keys()[itemIndex]
         #print "Item: ", itemIndex, " ", itemID
-
-        #memberName = 'John Connor'
-        #itemName = 'MovieB'
 
         for i,curAlg in enumerate(algs):
             start = time.time()
@@ -267,13 +267,13 @@ def  evaluate(trainHashData,trainingTableData,testHasData,models,userMap,movieMa
             if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="cosine_similarity":
                 rec = rs.recommend(trainHashData,memberID, itemID, limit, function_mappings[curAlg])
             elif curAlg=="general_popularity":
-                rec = rs.general_popularity(trainingTableData,movieMap, itemID)
+                rec = rs.general_popularity(trainTableData,movieMap, itemID)
             elif curAlg=="SVD":
                 rec = rs.SVD(models[0],userMap,movieMap, memberID, itemID)#toets deur om tableData in te vat en te kyk of dit decrease
             elif curAlg=="randomItem":
                 rec = rs.randomItem()
             else:
-                print "Incorrect algorithm name entered: ",curAlg
+                print "Incorrect algorithm name entered: ", curAlg
             runTime[i] += time.time()-start
 
             # I don't think mean squared error is needed yet. But it is a good practice to implement when actually
@@ -282,15 +282,15 @@ def  evaluate(trainHashData,trainingTableData,testHasData,models,userMap,movieMa
             '''if curAlg=="euclidean_similarity":
                 print("Alg rec: ",rec,". True ans: ",data[memberID][itemID])'''
 
-            results[i] += abs(rec-testHasData[memberID][itemID])
+            results[i] += abs(rec-testHasData[memberID][itemID])     # Average difference
+            #results[i] += pow(rec - testHasData[memberID][itemID],2)# RMS
     results /= testPerAlg
     return results,runTime
-
 # Database of 20m
-'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-20m/'
+dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-20m/'
 ratingsFile = dir + 'ratings.csv'
 userLocation = dir + 'users.csv'
-movieLocation = dir + 'movies.csv'''
+movieLocation = dir + 'movies.csv'
 
 # Database of 1m
 dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
@@ -314,7 +314,6 @@ algs = ['SVD','general_popularity']#['pearson_similarity','SVD','general_popular
 trainTimes,models = rs.train(trainTableData,algs=algs) #Train all the algorithms
 
 result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,100,algs=algs) #Test all the algorithms
-
 print "Results: ", result
 
 x = np.arange(len(algs))

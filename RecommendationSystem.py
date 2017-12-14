@@ -10,9 +10,6 @@ from scipy.sparse.linalg import svds
 #Please refer to Report.odt for a more detailed explanation and result page
 #of each algorithm
 
-def doNothing(data):
-    pass
-
 def trainSVD(data):
 
     # Adding data to missing entries to better generalise
@@ -23,22 +20,25 @@ def trainSVD(data):
     # Column avg:   0.8573
     # Mix avg:      0.793
     #print("Copying table..")
+    print("Copying table...")
+
+    start = time.time()
     tableData = data.copy()
 
-    #print("Adding addition values into table...")
-
+    print "Copied table in ", round(time.time()-start,2) ,"seconds. Calculating means in table..."
+    start = time.time()
     meanRows = np.zeros(len(tableData))
     meanColumns = np.zeros(len(tableData[0]))
     rowCount = np.zeros(len(tableData))
     columnsCount = np.zeros(len(tableData[0]))
-    #check = 0
+    check = 0
     for i in range(len(tableData)):
+
+        '''if i * len(tableData[0]) > check:
+            check += len(tableData) * len(tableData[0]) * 0.0001
+            print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 2), "%"'''
+
         for j in range(len(tableData[0])):
-
-            '''if i*len(tableData[0]) + j > check:
-                check += len(tableData)*len(tableData[0])*0.0001
-                print "Percentage completed: ", round(i * 100.0 / (len(tableData)*len(tableData[0])), 5), "%"'''
-
             if tableData[i][j] != 0.0:
 
                 meanRows[i] += tableData[i][j]
@@ -46,7 +46,8 @@ def trainSVD(data):
 
                 meanColumns[j] += tableData[i][j]
                 columnsCount[j] += 1
-    print("Almost there...")
+
+    #print "Now dividing the means ", time.time()-start, " seconds into mean calculation."
     for i in range(len(meanRows)):
         if rowCount[i] > 0:
 
@@ -62,25 +63,36 @@ def trainSVD(data):
                 meanColumns[i] = meanColumns[i] / columnsCount[i]
             else:
                 meanColumns[i] = 0.0 #<-- Don't recommend movie if now ratings has been given yet
-    #print("Adding now...")
+    print "Means calculated in ", round(time.time() - start, 2), "seconds. Artificially adding data..."
+    start = time.time()
     for i in range(len(tableData)):
+        '''if i * len(tableData[0]) > check:
+                    check += len(tableData) * len(tableData[0]) * 0.0001
+                    print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 2), "%"'''
         for j in range(len(tableData[0])):
             if tableData[i][j] == 0.0:
-                value = (meanRows[i] + meanColumns[j]) / 2.0
-                tableData[i][j] = value
+                tableData[i][j] = (meanRows[i] + meanColumns[j]) / 2.0
+
+    print "Added artificial data in  ", round(time.time() - start, 2), " seconds. De-meaning and calculating SVD..."
 
     # De-mean data
     #print("De-meaning data...")
     user_ratings_mean = np.mean(tableData, axis=1)
     R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
 
-    #print("Calculating SVD...")
-
     # Calculate the SVD
-    U, sigma, Vt = svds(R_demeaned, k=40)
+
+    start = time.time()
+
+    U, sigma, Vt = svds(R_demeaned, k=40) #k=40 means that 40 types of users will be considerd. Thus one user might be 80% user type 1 and 20% user type 2 and so forth.
+
+    print "De-meaned and calculated SVD in ", time.time()-start, "seconds."
+    start = time.time()
     sigma = np.diag(sigma)
 
     all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
+
+    print "Output matrix calculated in ", time.time() - start, "seconds. The ratings are now calculated."
 
     return all_user_predicted_ratings
 
@@ -116,7 +128,11 @@ def pearson_similarity(data,person1, person2):
     n = len(common_ranked_items)
 
     s1 = sum([data[person1][item] for item in common_ranked_items])
-    s2 = sum([data[person2][item] for item in common_ranked_items])
+    try:
+        s2 = sum([data[person2][item] for item in common_ranked_items])
+    except:
+        print person2, " ", item, " ", data[person2][item]
+        print common_ranked_items
 
     ss1 = sum([pow(data[person1][item], 2) for item in common_ranked_items])
     ss2 = sum([pow(data[person2][item], 2) for item in common_ranked_items])
@@ -180,14 +196,12 @@ def general_popularity(data,movieMap, item):
     meanCount = 0
 
     for i in range(len(data)):
-
         curScore = data[i][movieMap[item]]
-
         if curScore != 0:
             meanScore += curScore
             meanCount += 1
 
-    meanScore = meanScore/meanCount
+    meanScore = meanScore/meanCount if meanCount > 0 else 0
 
     return meanScore
 
@@ -196,6 +210,4 @@ def randomItem():
 
 def SVD(model,userMap,movieMap,userID,itemID):
     # Get and sort the user's predictions
-
-
     return model[userMap[userID]][movieMap[itemID]]
