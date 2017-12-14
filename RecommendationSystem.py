@@ -11,6 +11,7 @@ from scipy.sparse.linalg import svds
 #of each algorithm
 
 def trainSVD(data):
+    # user-item_rating = average_item_rating + (average_user_rating)
 
     # Adding data to missing entries to better generalise
 
@@ -31,12 +32,14 @@ def trainSVD(data):
     meanColumns = np.zeros(len(tableData[0]))
     rowCount = np.zeros(len(tableData))
     columnsCount = np.zeros(len(tableData[0]))
-    check = 0
+
+
+    #check = 0
     for i in range(len(tableData)):
 
         '''if i * len(tableData[0]) > check:
-            check += len(tableData) * len(tableData[0]) * 0.0001
-            print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 2), "%"'''
+            check += len(tableData) * len(tableData[0]) * 0.01
+            print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 0), "%"'''
 
         for j in range(len(tableData[0])):
             if tableData[i][j] != 0.0:
@@ -46,6 +49,9 @@ def trainSVD(data):
 
                 meanColumns[j] += tableData[i][j]
                 columnsCount[j] += 1
+
+                avgUserRating = tableData[i][j]
+
 
     #print "Now dividing the means ", time.time()-start, " seconds into mean calculation."
     for i in range(len(meanRows)):
@@ -63,15 +69,17 @@ def trainSVD(data):
                 meanColumns[i] = meanColumns[i] / columnsCount[i]
             else:
                 meanColumns[i] = 0.0 #<-- Don't recommend movie if now ratings has been given yet
+    avgUserRatings = sum(meanRows)/len(meanRows)
     print "Means calculated in ", round(time.time() - start, 2), "seconds. Artificially adding data..."
     start = time.time()
     for i in range(len(tableData)):
         '''if i * len(tableData[0]) > check:
-                    check += len(tableData) * len(tableData[0]) * 0.0001
-                    print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 2), "%"'''
+                    check += len(tableData) * len(tableData[0]) * 0.01
+                    print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 0), "%"'''
         for j in range(len(tableData[0])):
             if tableData[i][j] == 0.0:
-                tableData[i][j] = (meanRows[i] + meanColumns[j]) / 2.0
+                tableData[i][j] = meanColumns[j] + meanRows[i]-avgUserRatings # Average rating for each movie adjusted
+                # by how harsh the user rates compared to the average rating
 
     print "Added artificial data in  ", round(time.time() - start, 2), " seconds. De-meaning and calculating SVD..."
 
@@ -84,7 +92,7 @@ def trainSVD(data):
 
     start = time.time()
 
-    U, sigma, Vt = svds(R_demeaned, k=40) #k=40 means that 40 types of users will be considerd. Thus one user might be 80% user type 1 and 20% user type 2 and so forth.
+    U, sigma, Vt = svds(R_demeaned, k=25) #k=40 means that 40 features of users will be considerd. Thus one user might be 80% user type 1 and 20% user type 2 and so forth.
 
     print "De-meaned and calculated SVD in ", time.time()-start, "seconds."
     start = time.time()
@@ -111,7 +119,7 @@ def train(tableData,algs=['SVD']):
             models.append(function_mappings[curAlg](tableData))
         trainTime[i] += time.time() - start
     print "Training done."
-    return trainTime,models
+    return trainTime, models
 
 def euclidean_similarity(data,person1, person2):
 

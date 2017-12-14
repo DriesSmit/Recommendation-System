@@ -282,8 +282,8 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
             '''if curAlg=="euclidean_similarity":
                 print("Alg rec: ",rec,". True ans: ",data[memberID][itemID])'''
 
-            results[i] += abs(rec-testHasData[memberID][itemID])     # Average difference
-            #results[i] += pow(rec - testHasData[memberID][itemID],2)# RMS
+            results[i] += abs(rec-testHasData[memberID][itemID])     # Mean absolute error(MAE)
+            #results[i] += pow(rec - testHasData[memberID][itemID],2)# Mean square error(RMS)
     results /= testPerAlg
     return results,runTime
 # Database of 20m
@@ -310,7 +310,7 @@ sep = '\t'''
 trainHashData, trainTableData,testHashData,userMap,movieMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep)
 #trainHashData, trainTableData,testHashData = createOldData()
 
-algs = ['SVD','general_popularity']#['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
+algs = ['pearson_similarity','SVD','general_popularity']#['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 trainTimes,models = rs.train(trainTableData,algs=algs) #Train all the algorithms
 
 result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,100,algs=algs) #Test all the algorithms
