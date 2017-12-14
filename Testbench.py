@@ -150,7 +150,7 @@ def createData20ml(ratingsLoc,movieLoc):
 
     return hashTrainData,tableTrainData,hashTestData,userMap,movieMap
 
-def createData(ratingsLoc,userLoc,movieLoc,seperator):
+def createData(ratingsLoc,userLoc,movieLoc,seperator,seperator2='::'):
     print("Loading dataset...")
     r_cols = ['user_id', 'movie_id', 'rating', 'unix_timestamp']
     numUsers = 0
@@ -163,7 +163,7 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator):
     userMap = {}
     with open(userLoc) as myfile:
         for aline in myfile.readlines():
-            values = aline.split(seperator)
+            values = aline.split(seperator2)
             userMap[int(values[0])] = numUsers
             numUsers += 1
 
@@ -172,7 +172,7 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator):
     movieMap = {}
     with open(movieLoc) as myfile:
         for aline in myfile.readlines():
-            values = aline.split(seperator)
+            values = aline.split(seperator2)
             movieMap[int(values[0])] = numMovies
             numMovies += 1
 
@@ -240,7 +240,6 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
         'general_popularity': rs.general_popularity,
         'cosine_similarity': rs.cosine_similarity,
         'randomItem': rs.randomItem,
-        'SVD': rs.SVD,
     }
     #print("Value: ",data['Dries Smit']['MovieD'])
     results = np.zeros(len(algs))
@@ -268,8 +267,10 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
                 rec = rs.recommend(trainHashData,memberID, itemID, limit, function_mappings[curAlg])
             elif curAlg=="general_popularity":
                 rec = rs.general_popularity(trainTableData,movieMap, itemID)
-            elif curAlg=="SVD":
+            elif curAlg=="SVDFull":
                 rec = rs.SVD(models[0],userMap,movieMap, memberID, itemID)#toets deur om tableData in te vat en te kyk of dit decrease
+            elif curAlg=="SVDInc":
+                rec = rs.SVD(models[1],userMap,movieMap, memberID, itemID)#toets deur om tableData in te vat en te kyk of dit decrease
             elif curAlg=="randomItem":
                 rec = rs.randomItem()
             else:
@@ -293,24 +294,26 @@ userLocation = dir + 'users.csv'
 movieLocation = dir + 'movies.csv'
 
 # Database of 1m
-dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
+'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
 ratingsFile = dir + 'ratings.dat'
 userLocation = dir + 'users.dat'
 movieLocation = dir + 'movies.dat'
 sep = '::'
+sep2 = '::'''
 
 # Database of 100k
-'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
+dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
 ratingsFile = dir + 'u.data'
 userLocation = dir + 'u.user'
 movieLocation = dir + 'u.item'
-sep = '\t'''
+sep = '\t'
+sep2 = '|'
 
 #trainHashData, trainTableData,testHashData,userMap,movieMap = createData20ml(ratingsFile,movieLocation)
-trainHashData, trainTableData,testHashData,userMap,movieMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep)
+trainHashData, trainTableData,testHashData,userMap,movieMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
 #trainHashData, trainTableData,testHashData = createOldData()
 
-algs = ['pearson_similarity','SVD','general_popularity']#['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
+algs = ['pearson_similarity','SVDFull','SVDInc','general_popularity']#['pearson_similarity','SVDFull','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 trainTimes,models = rs.train(trainTableData,algs=algs) #Train all the algorithms
 
 result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,100,algs=algs) #Test all the algorithms

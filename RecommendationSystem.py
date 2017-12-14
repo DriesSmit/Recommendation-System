@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import math
 import random
-import pandas as pd
+import numpy as np
 import time
 from scipy.sparse.linalg import svds
 
@@ -10,7 +10,7 @@ from scipy.sparse.linalg import svds
 #Please refer to Report.odt for a more detailed explanation and result page
 #of each algorithm
 
-def trainSVD(data):
+def trainFullSVD(data):
     # user-item_rating = average_item_rating + (average_user_rating)
 
     # Adding data to missing entries to better generalise
@@ -104,19 +104,71 @@ def trainSVD(data):
 
     return all_user_predicted_ratings
 
+def trainIncrementalSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02):
+
+    R = np.array(data)
+    N = len(R)
+    M = len(R[0])
+
+    P = np.random.rand(N, K)
+    Q = np.random.rand(M, K)
+
+    Q = Q.T
+    check = 0
+    curAlpha = 0.01
+    for step in xrange(steps):
+        if curAlpha > alpha:
+            curAlpha *= 0.90
+        #print(curAlpha)
+        #print "Step: ", step
+
+        for i in xrange(len(R)):
+
+            if step*len(R)+i > check:
+                check += steps*len(R) * 0.001
+                print "Percentage completed: ", round((step*len(R)+i) * 100.0 / (steps*len(R)), 2), "%"
+            alphaBeta = curAlpha * beta
+
+            for j in xrange(len(R[i])):
+                if R[i][j] > 0:
+                    eij = R[i][j] - np.dot(P[i,:],Q[:,j])
+                    eAlpha2 = curAlpha * 2 * eij
+                    for k in xrange(K):
+                        P[i][k] += eAlpha2 * Q[k][j] - alphaBeta * P[i][k]
+                        Q[k][j] += eAlpha2 * P[i][k] - alphaBeta * Q[k][j]
+
+        #The code below is used to exit after a certain accuracy. This value does not really need to be calculated.
+        '''e = 0
+        for i in xrange(len(R)):
+            for j in xrange(len(R[i])):
+                if R[i][j] > 0:
+                    e = e + pow(R[i][j] - np.dot(P[i,:],Q[:,j]), 2)
+                    for k in xrange(K):
+                        e = e + (beta/2) * (pow(P[i][k],2) + pow(Q[k][j],2))
+        if e < 0.001:
+            break'''
+    nR = np.dot(P, Q)
+    return nR
+
 def train(tableData,algs=['SVD']):
     function_mappings = {
-        'SVD': trainSVD,
+        'SVDFull': trainFullSVD,
+        'SVDInc': trainIncrementalSVD,
     }
 
     trainTime = np.zeros(len(algs))
     models = []
+    models.append(None)
+    models.append(None)
 
     for i, curAlg in enumerate(algs):
         start = time.time()
-        if curAlg=='SVD':
+        if curAlg=='SVDFull':
+            print "Training ", curAlg, "..."
+            models[0] = function_mappings[curAlg](tableData)
+        elif curAlg=='SVDInc':
             print "Training ", curAlg,"..."
-            models.append(function_mappings[curAlg](tableData))
+            models[1] = function_mappings[curAlg](tableData,K=25,steps=5000)
         trainTime[i] += time.time() - start
     print "Training done."
     return trainTime, models

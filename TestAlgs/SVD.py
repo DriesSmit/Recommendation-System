@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 from scipy.sparse.linalg import svds
 
-def recommend_movies(predictions_df, userID, movies_df, original_ratings_df, num_recommendations=5):
+'''def recommend_movies(predictions_df, userID, movies_df, original_ratings_df, num_recommendations=5):
     # Get and sort the user's predictions
     user_row_number = userID - 1  # UserID starts at 1, not 0
 
@@ -70,4 +70,89 @@ preds_df = pd.DataFrame(all_user_predicted_ratings, columns = R_df.columns)
 already_rated, predictions = recommend_movies(preds_df, 837, movies_df, ratings_df, 10)
 
 #print(already_rated.head(10))
-print(predictions.head(10))
+print(predictions.head(10))'''
+
+
+
+#Test incremental SVD
+
+#!/usr/bin/python
+#
+# Created by Albert Au Yeung (2010)
+#
+# An implementation of matrix factorization
+#
+try:
+    import numpy
+except:
+    print "This implementation requires the numpy module."
+    exit(0)
+
+###############################################################################
+
+"""
+@INPUT:
+    R     : a matrix to be factorized, dimension N x M
+    P     : an initial matrix of dimension N x K
+    Q     : an initial matrix of dimension M x K
+    K     : the number of latent features
+    steps : the maximum number of steps to perform the optimisation
+    alpha : the learning rate
+    beta  : the regularization parameter
+@OUTPUT:
+    the final matrices P and Q
+"""
+def matrix_factorization(R, P, Q, K, steps=10, alpha=0.0002, beta=0.02):
+    Q = Q.T
+    curAlpha = 0.05
+    for step in xrange(steps):
+
+        if curAlpha > alpha:
+            curAlpha *= 0.95
+
+        for i in xrange(len(R)):
+            for j in xrange(len(R[i])):
+                if R[i][j] > 0:
+                    eij = R[i][j] - numpy.dot(P[i,:],Q[:,j])
+                    for k in xrange(K):
+                        P[i][k] = P[i][k] + curAlpha * (2 * eij * Q[k][j] - beta * P[i][k])
+                        Q[k][j] = Q[k][j] + curAlpha * (2 * eij * P[i][k] - beta * Q[k][j])
+        eR = numpy.dot(P,Q)
+        print("Step: ", step)
+        print(eR)
+        e = 0
+        for i in xrange(len(R)):
+            for j in xrange(len(R[i])):
+                if R[i][j] > 0:
+                    e = e + pow(R[i][j] - numpy.dot(P[i,:],Q[:,j]), 2)
+                    for k in xrange(K):
+                        e = e + (beta/2) * ( pow(P[i][k],2) + pow(Q[k][j],2) )
+        if e < 0.001:
+            break
+    return P, Q.T
+
+###############################################################################
+
+if __name__ == "__main__":
+    numpy.random.seed(0)
+    R = [
+         [5,3,0,1],
+         [4,0,0,1],
+         [1,1,0,5],
+         [1,0,0,4],
+         [0,1,5,4],
+        ]
+
+    R = numpy.array(R)
+
+    N = len(R)
+    M = len(R[0])
+    K = 2
+
+    P = numpy.random.rand(N,K)
+    Q = numpy.random.rand(M,K)
+
+    nP, nQ = matrix_factorization(R, P, Q, K)
+
+    nR = numpy.dot(nP, nQ.T)
+    print(nR)
