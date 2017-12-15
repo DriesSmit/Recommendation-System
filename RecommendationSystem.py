@@ -111,9 +111,13 @@ def trainFullSVD(data,demean=True):
 
     return all_user_predicted_ratings,U, sigma, Vt
 
-def trainIncrementalSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02,alphaReg=True,Q=None,P=None):
-    if Q is None:
 
+def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, alphaReg=True, Q=None, P=None):
+
+    print "Len valueMap: ",len(valueMap)
+    #print valueMap
+
+    if Q is None:
         N = len(data)
         M = len(data[0])
 
@@ -127,60 +131,50 @@ def trainIncrementalSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02,alphaReg=T
     else:
         curAlpha = alpha
 
-    #loopTime = 0.0
-    #otherTime = 0.0
+    # loopTime = 0.0
+    # otherTime = 0.0
     for step in xrange(steps):
-        #print "step", step
+
+        print "Step: ", step
+
         if curAlpha > alpha:
             curAlpha *= 0.90
 
-        stepLen = step*len(data)
-        for row in xrange(len(data)):
-            #start = time.time()
-            #print("Armed")
-            if stepLen+row > check:
-                #print("Start")
-                check += steps*len(data) * 0.01
+        if step > check:
+            #print("Start")
+            check += steps * 0.01
 
-                mae = 0.0
-                rse = 0.0
-                count = 0
-                skipRate = 5
-                for i in xrange(0,len(data),skipRate):
-                    for j in xrange(0,len(data[i]),skipRate):
-                        if data[i][j] > 0:
-                            mae += abs(data[i][j] - np.dot(P[i,:],Q[:,j]))  # Mean absolute error(MAE)
-                            rse += pow(data[i][j] - np.dot(P[i,:],Q[:,j]), 2)  # Mean absolute error(MAE)
-                            count += 1
-                mae = mae / count if count>0 else None
-                rse = rse / count if count>0 else None
+            mae = 0.0
+            rse = 0.0
+            for valLoc in valueMap:
+                mae += abs(data[valLoc[0]][valLoc[1]] - np.dot(P[valLoc[0],:],Q[:,valLoc[1]]))  # Mean absolute error(MAE)
+                rse += pow(data[valLoc[0]][valLoc[1]] - np.dot(P[valLoc[0],:],Q[:,valLoc[1]]), 2)  # Mean absolute error(MAE)
+            mae = mae / len(valueMap)
+            rse = rse / len(valueMap)
+            perc = round(step * 100.0 / steps, 2)
 
-                perc = round((step * len(data) + row) * 100.0 / (steps * len(data)), 2)
+            print "Percentage completed: ", perc, "%. Mean absolute error: ", round(mae,3), ". Root square error: ", round(rse, 3)
+            if mae < 0.001:
+                break
 
-                print "Percentage completed: ", perc, "%. Estimated mean absolute error: ", round(mae,3), ". Estimate root square error: ", round(rse, 3)
-                '''if mae < 0.001:
-                    break'''
+        alphaBeta = curAlpha * beta
+        # otherTime += time.time()-start
+        # start = time.time()
+        # print("Ready")
+        for valLoc in valueMap:
+            eij = data[valLoc[0]][valLoc[1]] - np.dot(P[valLoc[0], :], Q[:, valLoc[1]])
+            eAlpha2 = curAlpha * 2 * eij
+            for k in xrange(K):
+                P[valLoc[0]][k] += eAlpha2 * Q[k][valLoc[1]] - alphaBeta * P[valLoc[0]][k]
+                Q[k][valLoc[1]] += eAlpha2 * P[valLoc[0]][k] - alphaBeta * Q[k][valLoc[1]]
+        # loopTime += time.time() - start
 
-            alphaBeta = curAlpha * beta
-            #otherTime += time.time()-start
-            #start = time.time()
-            #print("Ready")
-            for col in xrange(len(data[row])):
-                if data[row][col] > 0:
-                    #print("Here")
-                    eij = data[row][col] - np.dot(P[row,:],Q[:,col])
-                    eAlpha2 = curAlpha * 2 * eij
-                    for k in xrange(K):
-                        P[row][k] += eAlpha2 * Q[k][col] - alphaBeta * P[row][k]
-                        Q[k][col] += eAlpha2 * P[row][k] - alphaBeta * Q[k][col]
-            #loopTime += time.time() - start
-
-    #print "Looptime: ", loopTime, ". Other: ", otherTime
+    # print "Looptime: ", loopTime, ". Other: ", otherTime
 
     nR = np.dot(P, Q)
     return nR
 
-def trainFullIncSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine FullInc to use both the previous functions. Save code
+def trainFullIncSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine FullInc to use both the previous functions. Save code
     ratingSVDFull,U, sigma, Q = trainFullSVD(data,demean=False)
     e = 0
     count = 0
@@ -198,7 +192,7 @@ def trainFullIncSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine Full
     #print "Q shape: ", Q.shape
     #print "P shape: ",P.shape
 
-    nR = trainIncrementalSVD(data, K=K, steps=steps, alpha=alpha, beta=beta,alphaReg=False, Q=Q, P=P)
+    nR = trainIncrementalSVD(data,valueMap, K=K, steps=steps, alpha=alpha, beta=beta,alphaReg=False, Q=Q, P=P)
 
     mae = 0.0
     rse = 0.0
@@ -212,10 +206,9 @@ def trainFullIncSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine Full
     mae = mae / count
     rse = rse / count
     print "FullIncSVD: Mean absolute error: ", round(mae, 3), ". Root square error: ", round(rse, 3)
-
     return nR
 
-def train(tableData,algs=['SVD']):
+def train(tableData,valueMap,algs=['SVD']):
     function_mappings = {
         'SVDFull': trainFullSVD,
         'SVDInc': trainIncrementalSVD,
@@ -237,10 +230,10 @@ def train(tableData,algs=['SVD']):
             models[0] = model
         elif curAlg=='SVDInc':
             print "Training ", curAlg,"..."
-            models[1] = function_mappings[curAlg](tableData,K=25,steps=4)
+            models[1] = function_mappings[curAlg](tableData,valueMap,K=25,steps=5)
         elif curAlg=='SVDFullInc':
             print "Training ", curAlg,"..."
-            models[2] = function_mappings[curAlg](tableData,K=25,steps=50,alpha=0.000001)
+            models[2] = function_mappings[curAlg](tableData,valueMap,K=25,steps=5,alpha=0.000001)
         trainTime[i] += time.time() - start
     print "Training done."
     return trainTime, models

@@ -109,6 +109,7 @@ def createData20ml(ratingsLoc,movieLoc):
     trainCount = 0
     userMap[int(values[0][0])] = 0
     tableTrainData = np.zeros((138493, 27278), dtype=np.float16)
+    valueMap = []
 
     nextCheck = 0
 
@@ -141,14 +142,16 @@ def createData20ml(ratingsLoc,movieLoc):
 
             idCount = values[i][0]
         if i % takeRate > 0:
+            valueMap.append((userMap[int(values[i][0])],movieMap[int(values[i][1])]))
             tableTrainData[userMap[int(values[i][0])]][movieMap[int(values[i][1])]] = values[i][2]
+
     hashTrainData[int(values[i][0])] = tempTrainHash
     hashTestData[int(values[i][0])] = tempTestHash
 
     print "Number of users: ", numUsers, ". Number of movies: ",numMovies
     print "Number of ratings: ",len(sortedRate),". Number of training ratings: ",trainCount, ". Number of test ratings: ",testCount
 
-    return hashTrainData,tableTrainData,hashTestData,userMap,movieMap
+    return hashTrainData,tableTrainData,hashTestData,userMap,movieMap,valueMap
 
 def createData(ratingsLoc,userLoc,movieLoc,seperator,seperator2='::'):
     print("Loading dataset...")
@@ -191,14 +194,14 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator,seperator2='::'):
     tempTrainHash = {}
     tempTestHash = {}
     tableTrainData = np.zeros((numUsers, numMovies))#Initialize any value not known to 2.5
-
+    valueMap = []
     takeRate = int(1.0/(1.0-train_test_ratio))
     testCount = 0
     trainCount = 0
     #A mapping algorithm might be needed if there are missing user ID's or movie ID's e.g. 1,2,3,5,6
     for i in range(len(values)):
-
         if i % takeRate > 0:
+            valueMap.append((userMap[int(values[i][0])],movieMap[int(values[i][1])]))
             tableTrainData[userMap[values[i][0]]][movieMap[values[i][1]]] = values[i][2]
 
         if(values[i][0]==idCount):
@@ -229,7 +232,7 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator,seperator2='::'):
     #print(hashTrainData)
     #print(hashTestData)
 
-    return hashTrainData,tableTrainData,hashTestData,userMap,movieMap
+    return hashTrainData,tableTrainData,hashTestData,userMap,movieMap,valueMap
 
 def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,testPerAlg,algs=['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']):
     print("Testing algorithms:")
@@ -298,26 +301,25 @@ userLocation = dir + 'users.csv'
 movieLocation = dir + 'movies.csv'
 
 # Database of 1m
-dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
+'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
 ratingsFile = dir + 'ratings.dat'
 userLocation = dir + 'users.dat'
 movieLocation = dir + 'movies.dat'
-sep2 = sep = '::'
+sep2 = sep = '::'''
 
 # Database of 100k
-dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
+'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
 ratingsFile = dir + 'u.data'
 userLocation = dir + 'u.user'
 movieLocation = dir + 'u.item'
 sep = '\t'
-sep2 = '|'
+sep2 = '|'''
 
-#trainHashData, trainTableData,testHashData,userMap,movieMap = createData20ml(ratingsFile,movieLocation)
-trainHashData, trainTableData,testHashData,userMap,movieMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
-#trainHashData, trainTableData,testHashData = createOldData()
+trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData20ml(ratingsFile,movieLocation)
+#trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
 
-algs = ['SVDFull','SVDFullInc']#['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
-trainTimes,models = rs.train(trainTableData,algs=algs) #Train all the algorithms
+algs = ['SVDFull','SVDFullInc','SVDInc']#['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
+trainTimes,models = rs.train(trainTableData,valueMap,algs=algs) #Train all the algorithms
 
 result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,100000,algs=algs) #Test all the algorithms
 print "Results: ", result

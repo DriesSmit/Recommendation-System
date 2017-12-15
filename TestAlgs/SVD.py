@@ -158,3 +158,76 @@ if __name__ == "__main__":
     print(nR)
 
 
+    def trainIncrementalSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02, alphaReg=True, Q=None, P=None):
+        if Q is None:
+            N = len(data)
+            M = len(data[0])
+
+            P = np.random.rand(N, K)
+            Q = np.random.rand(M, K)
+
+            Q = Q.T
+        check = 0
+        if alphaReg:
+            curAlpha = 0.01
+        else:
+            curAlpha = alpha
+
+        # Map non zeros
+        print "Mapping actual values."
+        valueMap = []
+        for row in xrange(len(data)):
+            for col in xrange(len(data[row])):
+                if data[row][col] > 0:
+                    valueMap.append((row, col))
+        print "Actual values mapped."
+
+        # loopTime = 0.0
+        # otherTime = 0.0
+        for step in xrange(steps):
+
+            print "Step: ", step
+
+            if curAlpha > alpha:
+                curAlpha *= 0.90
+
+            '''stepLen = step*len(data)
+            if stepLen+row > check:
+                #print("Start")
+                check += steps*len(data) * 0.01
+
+                mae = 0.0
+                rse = 0.0
+                count = 0
+                skipRate = 500
+                for i in xrange(0,len(data),skipRate):
+                    for j in xrange(0,len(data[i]),skipRate):
+                        if data[i][j] > 0:
+                            mae += abs(data[i][j] - np.dot(P[i,:],Q[:,j]))  # Mean absolute error(MAE)
+                            rse += pow(data[i][j] - np.dot(P[i,:],Q[:,j]), 2)  # Mean absolute error(MAE)
+                            count += 1
+                mae = mae / count if count>0 else None
+                rse = rse / count if count>0 else None
+
+                perc = round((step * len(data) + row) * 100.0 / (steps * len(data)), 2)
+
+                print "Percentage completed: ", perc #, "%. Estimated mean absolute error: ", round(mae,3), ". Estimate root square error: ", round(rse, 3)
+                if mae < 0.001:
+                    break'''
+
+            alphaBeta = curAlpha * beta
+            # otherTime += time.time()-start
+            # start = time.time()
+            # print("Ready")
+            for valLoc in valueMap:
+                eij = data[row][col] - np.dot(P[valLoc[0], :], Q[:, valLoc[1]])
+                eAlpha2 = curAlpha * 2 * eij
+                for k in xrange(K):
+                    P[valLoc[0]][k] += eAlpha2 * Q[k][valLoc[1]] - alphaBeta * P[row][k]
+                    Q[k][valLoc[1]] += eAlpha2 * P[valLoc[0]][k] - alphaBeta * Q[k][valLoc[1]]
+            # loopTime += time.time() - start
+
+        # print "Looptime: ", loopTime, ". Other: ", otherTime
+
+        nR = np.dot(P, Q)
+        return nR
