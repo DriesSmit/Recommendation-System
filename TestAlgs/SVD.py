@@ -156,3 +156,5 @@ if __name__ == "__main__":
 
     nR = numpy.dot(nP, nQ.T)
     print(nR)
+
+

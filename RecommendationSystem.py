@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import math
 import random
 import numpy as np
@@ -10,7 +8,7 @@ from scipy.sparse.linalg import svds
 #Please refer to Report.odt for a more detailed explanation and result page
 #of each algorithm
 
-def trainFullSVD(data):
+def trainFullSVD(data,demean=True):
     # user-item_rating = average_item_rating + (average_user_rating)
 
     # Adding data to missing entries to better generalise
@@ -33,8 +31,6 @@ def trainFullSVD(data):
     rowCount = np.zeros(len(tableData))
     columnsCount = np.zeros(len(tableData[0]))
 
-
-    #check = 0
     for i in range(len(tableData)):
 
         '''if i * len(tableData[0]) > check:
@@ -83,175 +79,109 @@ def trainFullSVD(data):
 
     print "Added artificial data in  ", round(time.time() - start, 2), " seconds. De-meaning and calculating SVD..."
 
-    # De-mean data
-    #print("De-meaning data...")
-    user_ratings_mean = np.mean(tableData, axis=1)
-    R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
-
     # Calculate the SVD
 
     start = time.time()
 
-    U, sigma, Vt = svds(R_demeaned, k=25) #k=40 means that 40 features of users will be considerd. Thus one user might be 80% user type 1 and 20% user type 2 and so forth.
+    if demean:
+        user_ratings_mean = np.mean(tableData, axis=1)
+        R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
+        # Calculate the SVD
+        U, sigma, Vt = svds(R_demeaned, k=50)
+        sigma = np.diag(sigma)
+        all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
+    else:
+        U, sigma, Vt = svds(tableData, k=25) #k=40 means that 40 features of users will be considerd. Thus one user might be 80% user type 1 and 20% user type 2 and so forth.
+        sigma = np.diag(sigma)
+        all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt)
+    print "Calculated SVD in ", time.time()-start, "seconds."
 
-    print "De-meaned and calculated SVD in ", time.time()-start, "seconds."
-    start = time.time()
-    sigma = np.diag(sigma)
+    mae = 0.0
+    rse = 0.0
+    count = 0
+    for i in xrange(len(data)):
+        for j in xrange(len(data[i])):
+            if data[i][j] > 0:
+                mae += abs(data[i][j] - all_user_predicted_ratings[i][j])  # Mean absolute error(MAE)
+                rse += pow(data[i][j] - all_user_predicted_ratings[i][j],2)  # Mean absolute error(MAE)
+                count += 1
+    mae = mae / count
+    rse = rse / count
+    print "FullSVD: Mean absolute error: ", round(mae, 3),". Root square error: ",round(rse, 3)
 
-    all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
+    return all_user_predicted_ratings,U, sigma, Vt
 
-    print "Output matrix calculated in ", time.time() - start, "seconds. The ratings are now calculated."
+def trainIncrementalSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02,alphaReg=True,Q=None,P=None):
+    if Q is None:
 
-    return all_user_predicted_ratings
+        N = len(data)
+        M = len(data[0])
 
-def trainIncrementalSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02,Q=None,P=None):
+        P = np.random.rand(N, K)
+        Q = np.random.rand(M, K)
 
-    R = np.array(data)
-
-    '''if Q==None:'''
-
-    N = len(R)
-    M = len(R[0])
-
-    P = np.random.rand(N, K)
-    Q = np.random.rand(M, K)
-
-    Q = Q.T
-
-    '''else:'''
-
+        Q = Q.T
     check = 0
-    curAlpha = 0.01
+    if alphaReg:
+        curAlpha = 0.01
+    else:
+        curAlpha = alpha
+
+    #loopTime = 0.0
+    #otherTime = 0.0
     for step in xrange(steps):
+        #print "step", step
         if curAlpha > alpha:
             curAlpha *= 0.90
-        #print(curAlpha)
-        #print "Step: ", step
 
-        for row in xrange(len(R)):
-            if step*len(R)+row > check:
-                check += steps*len(R) * 0.01
+        stepLen = step*len(data)
+        for row in xrange(len(data)):
+            #start = time.time()
+            #print("Armed")
+            if stepLen+row > check:
+                #print("Start")
+                check += steps*len(data) * 0.01
 
-                e = 0
+                mae = 0.0
+                rse = 0.0
                 count = 0
-                for i in xrange(len(R)):
-                    for j in xrange(len(R[i])):
-                        if R[i][j] > 0:
-                            e += abs(R[i][j] - np.dot(P[i,:],Q[:,j])) # Mean absolute error(MAE)
+                skipRate = 5
+                for i in xrange(0,len(data),skipRate):
+                    for j in xrange(0,len(data[i]),skipRate):
+                        if data[i][j] > 0:
+                            mae += abs(data[i][j] - np.dot(P[i,:],Q[:,j]))  # Mean absolute error(MAE)
+                            rse += pow(data[i][j] - np.dot(P[i,:],Q[:,j]), 2)  # Mean absolute error(MAE)
                             count += 1
-                mae = e/count
+                mae = mae / count if count>0 else None
+                rse = rse / count if count>0 else None
 
-                perc = round((step * len(R) + row) * 100.0 / (steps * len(R)), 2)
+                perc = round((step * len(data) + row) * 100.0 / (steps * len(data)), 2)
 
-                print "Percentage completed: ", perc , "%. Mean absolute error: ", round(mae,3)
-                if e < 0.001:
-                    break
+                print "Percentage completed: ", perc, "%. Estimated mean absolute error: ", round(mae,3), ". Estimate root square error: ", round(rse, 3)
+                '''if mae < 0.001:
+                    break'''
 
             alphaBeta = curAlpha * beta
-
-            for col in xrange(len(R[row])):
-                if R[row][col] > 0:
-                    eij = R[row][col] - np.dot(P[row,:],Q[:,col])
+            #otherTime += time.time()-start
+            #start = time.time()
+            #print("Ready")
+            for col in xrange(len(data[row])):
+                if data[row][col] > 0:
+                    #print("Here")
+                    eij = data[row][col] - np.dot(P[row,:],Q[:,col])
                     eAlpha2 = curAlpha * 2 * eij
                     for k in xrange(K):
                         P[row][k] += eAlpha2 * Q[k][col] - alphaBeta * P[row][k]
                         Q[k][col] += eAlpha2 * P[row][k] - alphaBeta * Q[k][col]
+            #loopTime += time.time() - start
 
-        #The code below is used to exit after a certain accuracy. This value does not really need to be calculated.
-        '''e = 0
-        for i in xrange(len(R)):
-            for j in xrange(len(R[i])):
-                if R[i][j] > 0:
-                    e = e + pow(R[i][j] - np.dot(P[i,:],Q[:,j]), 2)
-                    for k in xrange(K):
-                        e = e + (beta/2) * (pow(P[i][k],2) + pow(Q[k][j],2))
-        if e < 0.001:
-            break'''
+    #print "Looptime: ", loopTime, ". Other: ", otherTime
+
     nR = np.dot(P, Q)
     return nR
 
 def trainFullIncSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine FullInc to use both the previous functions. Save code
-    # user-item_rating = average_item_rating + (average_user_rating)
-
-    # Adding data to missing entries to better generalise
-
-    # For initialisation the average between mean Columns and Rows was found to be the best values to use.
-    # For a k=100 value and using the testHash set for u1
-    # Row avg:      1.01
-    # Column avg:   0.8573
-    # Mix avg:      0.793
-    #print("Copying table..")
-    print("Copying table...")
-
-    start = time.time()
-    tableData = data.copy()
-
-    print "Copied table in ", round(time.time()-start,2) ,"seconds. Calculating means in table..."
-    start = time.time()
-    meanRows = np.zeros(len(tableData))
-    meanColumns = np.zeros(len(tableData[0]))
-    rowCount = np.zeros(len(tableData))
-    columnsCount = np.zeros(len(tableData[0]))
-
-
-    #check = 0
-    for i in range(len(tableData)):
-
-        '''if i * len(tableData[0]) > check:
-            check += len(tableData) * len(tableData[0]) * 0.01
-            print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 0), "%"'''
-
-        for j in range(len(tableData[0])):
-            if tableData[i][j] != 0.0:
-
-                meanRows[i] += tableData[i][j]
-                rowCount[i] += 1
-
-                meanColumns[j] += tableData[i][j]
-                columnsCount[j] += 1
-
-                avgUserRating = tableData[i][j]
-
-
-    #print "Now dividing the means ", time.time()-start, " seconds into mean calculation."
-    for i in range(len(meanRows)):
-        if rowCount[i] > 0:
-
-            if rowCount[i]!=0:
-                meanRows[i] = meanRows[i] / rowCount[i]
-            else:
-                meanRows[i] = 2.5 #<-- Set to the medium rating as a starting point
-
-    for i in range(len(meanColumns)):
-        if columnsCount[i] > 0:
-
-            if columnsCount[i]!=0:
-                meanColumns[i] = meanColumns[i] / columnsCount[i]
-            else:
-                meanColumns[i] = 0.0 #<-- Don't recommend movie if now ratings has been given yet
-    avgUserRatings = sum(meanRows)/len(meanRows)
-    print "Means calculated in ", round(time.time() - start, 2), "seconds. Artificially adding data..."
-    start = time.time()
-    for i in range(len(tableData)):
-        '''if i * len(tableData[0]) > check:
-                    check += len(tableData) * len(tableData[0]) * 0.01
-                    print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 0), "%"'''
-        for j in range(len(tableData[0])):
-            if tableData[i][j] == 0.0:
-                tableData[i][j] = meanColumns[j] + meanRows[i]-avgUserRatings # Average rating for each movie adjusted
-                # by how harsh the user rates compared to the average rating
-
-    print "Added artificial data in  ", round(time.time() - start, 2), " seconds. Calculating SVD..."
-    # Calculate the SVD
-
-    start = time.time()
-
-    U, sigma, Q = svds(tableData, k=25) #k=40 means that 40 features of users will be considerd. Thus one user might be 80% user type 1 and 20% user type 2 and so forth.
-
-    sigma = np.diag(sigma)
-
-    ratingSVDFull = np.dot(np.dot(U, sigma), Q)
-
+    ratingSVDFull,U, sigma, Q = trainFullSVD(data,demean=False)
     e = 0
     count = 0
     for i in xrange(len(data)):
@@ -268,51 +198,22 @@ def trainFullIncSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine Full
     #print "Q shape: ", Q.shape
     #print "P shape: ",P.shape
 
-    print "Calculated SVD in ", time.time()-start, "seconds. Applying SVD incremental algorithm..."
-    start = time.time()
-    #Q = Q.T
-    check = 0
-    for step in xrange(steps):
-        # print(curAlpha)
-        #print "Step: ", step
+    nR = trainIncrementalSVD(data, K=K, steps=steps, alpha=alpha, beta=beta,alphaReg=False, Q=Q, P=P)
 
-        for row in xrange(len(data)):
-
-            if step * len(data) + row > check:
-                #print("Start")
-                check += steps * len(data) * 0.01
-
-                e = 0
-                count = 0
-                for i in xrange(len(data)):
-                    for j in xrange(len(data[i])):
-                        if data[i][j] > 0:
-                            e += abs(data[i][j] - np.dot(P[i, :], Q[:, j]))  # Mean absolute error(MAE)
-                            count += 1
-                mae = e / count
-
-                perc = round(float(step * len(data) + row) * 100.0 / float(steps * len(data)), 2)
-
-                print "Percentage completed: ", perc, "%. Mean absolute error: ", round(mae, 3)
-                if e < 0.001:
-                    break
-
-            alphaBeta = alpha * beta
-
-            for col in xrange(len(data[row])):
-                if data[row][col] > 0:
-                    eij = data[row][col] - np.dot(P[row, :], Q[:, col])
-                    eAlpha2 = alpha * 2 * eij
-                    for k in xrange(K):
-                        P[row][k] += eAlpha2 * Q[k][col] - alphaBeta * P[row][k]
-                        Q[k][col] += eAlpha2 * P[row][k] - alphaBeta * Q[k][col]
-    nR = np.dot(P, Q)
-
-    print "Final output matrix calculated in ", time.time() - start, "seconds. The ratings are now calculated."
+    mae = 0.0
+    rse = 0.0
+    count = 0
+    for i in xrange(len(data)):
+        for j in xrange(len(data[i])):
+            if data[i][j] > 0:
+                mae += abs(data[i][j] - nR[i][j])  # Mean absolute error(MAE)
+                rse += pow(data[i][j] - nR[i][j], 2)  # Mean absolute error(MAE)
+                count += 1
+    mae = mae / count
+    rse = rse / count
+    print "FullIncSVD: Mean absolute error: ", round(mae, 3), ". Root square error: ", round(rse, 3)
 
     return nR
-
-    return all_user_predicted_ratings
 
 def train(tableData,algs=['SVD']):
     function_mappings = {
@@ -328,13 +229,15 @@ def train(tableData,algs=['SVD']):
     models.append(None)
 
     for i, curAlg in enumerate(algs):
+        #print(curAlg)
         start = time.time()
         if curAlg=='SVDFull':
             print "Training ", curAlg, "..."
-            models[0] = function_mappings[curAlg](tableData)
+            model,_,_,_ = function_mappings[curAlg](tableData)
+            models[0] = model
         elif curAlg=='SVDInc':
             print "Training ", curAlg,"..."
-            models[1] = function_mappings[curAlg](tableData,K=25,steps=50)
+            models[1] = function_mappings[curAlg](tableData,K=25,steps=4)
         elif curAlg=='SVDFullInc':
             print "Training ", curAlg,"..."
             models[2] = function_mappings[curAlg](tableData,K=25,steps=50,alpha=0.000001)
