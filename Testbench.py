@@ -270,7 +270,9 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
             elif curAlg=="SVDFull":
                 rec = rs.SVD(models[0],userMap,movieMap, memberID, itemID)#toets deur om tableData in te vat en te kyk of dit decrease
             elif curAlg=="SVDInc":
-                rec = rs.SVD(models[1],userMap,movieMap, memberID, itemID)#toets deur om tableData in te vat en te kyk of dit decrease
+                rec = rs.SVD(models[1],userMap,movieMap, memberID, itemID)
+            elif curAlg=="SVDFullInc":
+                rec = rs.SVD(models[2],userMap,movieMap, memberID, itemID)
             elif curAlg=="randomItem":
                 rec = rs.randomItem()
             else:
@@ -313,10 +315,10 @@ sep2 = '|'
 trainHashData, trainTableData,testHashData,userMap,movieMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
 #trainHashData, trainTableData,testHashData = createOldData()
 
-algs = ['pearson_similarity','SVDFull','SVDInc','general_popularity']#['pearson_similarity','SVDFull','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
+algs = ['pearson_similarity','SVDFull','SVDInc','SVDFullInc','general_popularity']#['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 trainTimes,models = rs.train(trainTableData,algs=algs) #Train all the algorithms
 
-result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,100,algs=algs) #Test all the algorithms
+result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,500,algs=algs) #Test all the algorithms
 print "Results: ", result
 
 x = np.arange(len(algs))
