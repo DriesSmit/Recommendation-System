@@ -77,7 +77,6 @@ def createData20ml(ratingsLoc,movieLoc):
     numMovies = 0
 
     train_test_ratio = 0.9 # 0.8 = 80% training data and 20% test data
-
     # Count movies and build map
     numMovies = 0
     movieMap = {}
@@ -143,8 +142,7 @@ def createData20ml(ratingsLoc,movieLoc):
             idCount = values[i][0]
         if i % takeRate > 0:
             valueMap.append((userMap[int(values[i][0])],movieMap[int(values[i][1])]))
-            tableTrainData[userMap[int(values[i][0])]][movieMap[int(values[i][1])]] = values[i][2]
-
+            tableTrainData[userMap[int(values[i][0])]][movieMap[int(values[i][1])]] = float(values[i][2])
     hashTrainData[int(values[i][0])] = tempTrainHash
     hashTestData[int(values[i][0])] = tempTestHash
 
@@ -267,17 +265,18 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
         for i,curAlg in enumerate(algs):
             start = time.time()
             limit = 150
-            #It doesn't look like there is a case statement alternative in python
-            if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="cosine_similarity":
+            # It doesn't look like there is a case statement alternative in python. Further will be faster to store the
+            # tests in an array and then run it separately for each algorithm, but this format looks better.
+            if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="cosine_similarity":   #K nearest neighbors algorithms
                 rec = rs.recommend(trainHashData,memberID, itemID, limit, function_mappings[curAlg])
             elif curAlg=="general_popularity":
                 rec = rs.general_popularity(trainTableData,movieMap, itemID)
             elif curAlg=="SVDFull":
-                rec = rs.SVD(models[0],userMap,movieMap, memberID, itemID)#toets deur om tableData in te vat en te kyk of dit decrease
+                rec = rs.tableSVD(models[0],userMap,movieMap, memberID, itemID)
             elif curAlg=="SVDInc":
-                rec = rs.SVD(models[1],userMap,movieMap, memberID, itemID)
+                rec = rs.incSVD(models[1],userMap,movieMap, memberID, itemID)
             elif curAlg=="SVDFullInc":
-                rec = rs.SVD(models[2],userMap,movieMap, memberID, itemID)
+                rec = rs.incSVD(models[2],userMap,movieMap, memberID, itemID)
             elif curAlg=="randomItem":
                 rec = rs.randomItem()
             else:
@@ -295,10 +294,10 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
     results /= testPerAlg
     return results,runTime
 # Database of 20m
-dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-20m/'
+'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-20m/'
 ratingsFile = dir + 'ratings.csv'
 userLocation = dir + 'users.csv'
-movieLocation = dir + 'movies.csv'
+movieLocation = dir + 'movies.csv'''
 
 # Database of 1m
 '''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
@@ -308,20 +307,21 @@ movieLocation = dir + 'movies.dat'
 sep2 = sep = '::'''
 
 # Database of 100k
-'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
+dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
 ratingsFile = dir + 'u.data'
 userLocation = dir + 'u.user'
 movieLocation = dir + 'u.item'
 sep = '\t'
-sep2 = '|'''
+sep2 = '|'
 
-trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData20ml(ratingsFile,movieLocation)
-#trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
+#trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData20ml(ratingsFile,movieLocation)
+trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
 
-algs = ['SVDFull','SVDFullInc','SVDInc']#['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
+# ['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
+algs = ['SVDFull','SVDFullInc','SVDInc']
 trainTimes,models = rs.train(trainTableData,valueMap,algs=algs) #Train all the algorithms
 
-result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,100000,algs=algs) #Test all the algorithms
+result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,200,algs=algs) #Test all the algorithms
 print "Results: ", result
 
 x = np.arange(len(algs))

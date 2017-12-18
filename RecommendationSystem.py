@@ -87,12 +87,26 @@ def trainFullSVD(data,demean=True):
         user_ratings_mean = np.mean(tableData, axis=1)
         R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
         # Calculate the SVD
-        U, sigma, Vt = svds(R_demeaned, k=50)
-        sigma = np.diag(sigma)
-        all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt) + user_ratings_mean.reshape(-1, 1)
+        #R_demeaned.asfptype()
+        U, sigma, Vt = svds(R_demeaned, k=25)
+
+        # The matrices need to be converted to lower byte type to calculate the full table
+        # for the 20m rating dataset.
+        sigma = np.array(np.diag(sigma),dtype=np.float16)
+        U = np.array(U,dtype=np.float16)
+        Vt = np.array(Vt, dtype=np.float16)
+        all_user_predicted_ratings = np.dot(np.array(np.dot(U, sigma)), Vt) + user_ratings_mean.reshape(-1, 1)
     else:
-        U, sigma, Vt = svds(tableData, k=25) #k=40 means that 40 features of users will be considerd. Thus one user might be 80% user type 1 and 20% user type 2 and so forth.
-        sigma = np.diag(sigma)
+        U, sigma, Vt = svds(tableData, k=25)    # k=40 means that 40 features of users will be considerd.
+                                                # Thus one user might be 80% user type 1 and 20% user type 2 and so
+                                                # forth.
+
+        # The matrices need to be converted to lower byte type to calculate the full table
+        # for the 20m rating dataset.
+        sigma = np.array(np.diag(sigma), dtype=np.float16)
+        U = np.array(U, dtype=np.float16)
+        Vt = np.array(Vt, dtype=np.float16)
+
         all_user_predicted_ratings = np.dot(np.dot(U, sigma), Vt)
     print "Calculated SVD in ", time.time()-start, "seconds."
 
@@ -111,21 +125,26 @@ def trainFullSVD(data,demean=True):
 
     return all_user_predicted_ratings,U, sigma, Vt
 
-
 def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, alphaReg=True, Q=None, P=None):
-
-    print "Len valueMap: ",len(valueMap)
-    #print valueMap
-
     if Q is None:
         N = len(data)
         M = len(data[0])
 
         P = np.random.rand(N, K)
+
         Q = np.random.rand(M, K)
+
+
 
         Q = Q.T
     check = 0
+
+    P = np.array(P, dtype=np.float64)
+    Q = np.array(Q, dtype=np.float64)# 64 bit seems to be the faster precision. Maybe the underlining C implementation
+                                     # uses faster channels to execute the 64 bit calculation in the CPU.
+    #print("Starting...")
+    #nR = np.dot(P, Q)# Just for testing
+    #print("Done")
     if alphaReg:
         curAlpha = 0.01
     else:
@@ -134,34 +153,32 @@ def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, 
     # loopTime = 0.0
     # otherTime = 0.0
     for step in xrange(steps):
-
         print "Step: ", step
-
         if curAlpha > alpha:
             curAlpha *= 0.90
-
-        if step > check:
-            #print("Start")
-            check += steps * 0.01
-
-            mae = 0.0
-            rse = 0.0
-            for valLoc in valueMap:
-                mae += abs(data[valLoc[0]][valLoc[1]] - np.dot(P[valLoc[0],:],Q[:,valLoc[1]]))  # Mean absolute error(MAE)
-                rse += pow(data[valLoc[0]][valLoc[1]] - np.dot(P[valLoc[0],:],Q[:,valLoc[1]]), 2)  # Mean absolute error(MAE)
-            mae = mae / len(valueMap)
-            rse = rse / len(valueMap)
-            perc = round(step * 100.0 / steps, 2)
-
-            print "Percentage completed: ", perc, "%. Mean absolute error: ", round(mae,3), ". Root square error: ", round(rse, 3)
-            if mae < 0.001:
-                break
-
+            #print "End"
         alphaBeta = curAlpha * beta
         # otherTime += time.time()-start
         # start = time.time()
         # print("Ready")
-        for valLoc in valueMap:
+        stepVal = step*len(valueMap)
+        for indexVal,valLoc in enumerate(valueMap):
+            if stepVal+indexVal >= check:
+                # print("Start: ",len(valueMap),". Value map[0]: ",valueMap[0])
+                check += steps*len(valueMap) * 0.01
+                '''mae = 0.0
+                rse = 0.0
+                # It is more efficient to only calculate the cells needed instead of the whole matrix
+                for valLoc in valueMap:
+                    mae += abs(data[valLoc[0]][valLoc[1]] - np.dot(P[valLoc[0],:],Q[:,valLoc[1]]))  # Mean absolute error(MAE)
+                    rse += pow(data[valLoc[0]][valLoc[1]] - np.dot(P[valLoc[0],:],Q[:,valLoc[1]]), 2)  # Mean absolute error(MAE)
+                mae = mae / len(valueMap)
+                rse = rse / len(valueMap)'''
+                perc = round((indexVal+step*len(valueMap)) * 100.0 / (steps*len(valueMap)), 1)
+                print "Percentage completed: ", perc  # , "%. Mean absolute error: ", round(mae,4), ". Root square error: ", round(rse, 3)
+                '''if mae < 0.001:
+                    break'''
+
             eij = data[valLoc[0]][valLoc[1]] - np.dot(P[valLoc[0], :], Q[:, valLoc[1]])
             eAlpha2 = curAlpha * 2 * eij
             for k in xrange(K):
@@ -169,10 +186,15 @@ def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, 
                 Q[k][valLoc[1]] += eAlpha2 * P[valLoc[0]][k] - alphaBeta * Q[k][valLoc[1]]
         # loopTime += time.time() - start
 
-    # print "Looptime: ", loopTime, ". Other: ", otherTime
+    model = []
 
-    nR = np.dot(P, Q)
-    return nR
+    #P = np.array(P, dtype=np.float16) #Convert back for if the whole table needs to be calculated.
+    #Q = np.array(Q, dtype=np.float16) #
+
+    model.append(P)
+    model.append(Q)
+    #nR = np.dot(P, Q) #If the database grows more it might not be necessary to even calculate the full SVD matrix.
+    return model
 
 def trainFullIncSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine FullInc to use both the previous functions. Save code
     ratingSVDFull,U, sigma, Q = trainFullSVD(data,demean=False)
@@ -192,21 +214,21 @@ def trainFullIncSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02):#Com
     #print "Q shape: ", Q.shape
     #print "P shape: ",P.shape
 
-    nR = trainIncrementalSVD(data,valueMap, K=K, steps=steps, alpha=alpha, beta=beta,alphaReg=False, Q=Q, P=P)
+    model = trainIncrementalSVD(data,valueMap, K=K, steps=steps, alpha=alpha, beta=beta,alphaReg=False, Q=Q, P=P)
 
     mae = 0.0
     rse = 0.0
-    count = 0
-    for i in xrange(len(data)):
-        for j in xrange(len(data[i])):
-            if data[i][j] > 0:
-                mae += abs(data[i][j] - nR[i][j])  # Mean absolute error(MAE)
-                rse += pow(data[i][j] - nR[i][j], 2)  # Mean absolute error(MAE)
-                count += 1
-    mae = mae / count
-    rse = rse / count
+    for valLoc in valueMap:
+
+        trueRating = data[valLoc[0]][valLoc[1]]
+        predictRating = np.dot(model[0][valLoc[0], :], model[1][:, valLoc[1]])
+
+        mae += abs(trueRating - predictRating)  # Mean absolute error(MAE)
+        rse += pow(trueRating - predictRating, 2)  # Mean absolute error(MAE)
+    mae = mae / len(valueMap)
+    rse = rse / len(valueMap)
     print "FullIncSVD: Mean absolute error: ", round(mae, 3), ". Root square error: ", round(rse, 3)
-    return nR
+    return model
 
 def train(tableData,valueMap,algs=['SVD']):
     function_mappings = {
@@ -230,11 +252,13 @@ def train(tableData,valueMap,algs=['SVD']):
             models[0] = model
         elif curAlg=='SVDInc':
             print "Training ", curAlg,"..."
-            models[1] = function_mappings[curAlg](tableData,valueMap,K=25,steps=5)
+            models[1] = function_mappings[curAlg](tableData,valueMap,K=25,steps=10)
         elif curAlg=='SVDFullInc':
             print "Training ", curAlg,"..."
-            models[2] = function_mappings[curAlg](tableData,valueMap,K=25,steps=5,alpha=0.000001)
+            models[2] = function_mappings[curAlg](tableData,valueMap,K=25,steps=10,alpha=0.000001)
         trainTime[i] += time.time() - start
+        print "Training time for ",curAlg, " is ", trainTime[i], "."
+
     print "Training done."
     return trainTime, models
 
@@ -317,6 +341,8 @@ def recommend(data,person, item,bound, similarity=pearson_similarity):
 
 def general_popularity(data,movieMap, item):
 
+    # This function, if used, can be sped up by calculating all the means beforehand.
+
     meanScore = 0.0
     meanCount = 0
 
@@ -333,6 +359,15 @@ def general_popularity(data,movieMap, item):
 def randomItem():
     return random.random()
 
-def SVD(model,userMap,movieMap,userID,itemID):
-    # Get and sort the user's predictions
+def tableSVD(model,userMap,movieMap,userID,itemID):
+    # Get the user's predictions
     return model[userMap[userID]][movieMap[itemID]]
+
+def incSVD(model,userMap,movieMap,userID,itemID):
+    # Get the user's predictions
+    userLoc = userMap[userID]
+    movieLoc = movieMap[itemID]
+    P = model[0]
+    Q = model[1]
+
+    return np.dot(P[userLoc, :], Q[:, movieLoc])
