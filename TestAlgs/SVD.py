@@ -71,11 +71,6 @@ already_rated, predictions = recommend_movies(preds_df, 837, movies_df, ratings_
 
 #print(already_rated.head(10))
 print(predictions.head(10))'''
-
-
-
-#Test incremental SVD
-
 #!/usr/bin/python
 #
 # Created by Albert Au Yeung (2010)
@@ -102,24 +97,17 @@ except:
 @OUTPUT:
     the final matrices P and Q
 """
-def matrix_factorization(R, P, Q, K, steps=10, alpha=0.0002, beta=0.02):
+def matrix_factorization(R, P, Q, K, steps=5000, alpha=0.0002, beta=0.02):
     Q = Q.T
-    curAlpha = 0.05
     for step in xrange(steps):
-
-        if curAlpha > alpha:
-            curAlpha *= 0.95
-
         for i in xrange(len(R)):
             for j in xrange(len(R[i])):
                 if R[i][j] > 0:
                     eij = R[i][j] - numpy.dot(P[i,:],Q[:,j])
                     for k in xrange(K):
-                        P[i][k] = P[i][k] + curAlpha * (2 * eij * Q[k][j] - beta * P[i][k])
-                        Q[k][j] = Q[k][j] + curAlpha * (2 * eij * P[i][k] - beta * Q[k][j])
+                        P[i][k] = P[i][k] + alpha * (2 * eij * Q[k][j] - beta * P[i][k])
+                        Q[k][j] = Q[k][j] + alpha * (2 * eij * P[i][k] - beta * Q[k][j])
         eR = numpy.dot(P,Q)
-        print("Step: ", step)
-        print(eR)
         e = 0
         for i in xrange(len(R)):
             for j in xrange(len(R[i])):
@@ -134,13 +122,12 @@ def matrix_factorization(R, P, Q, K, steps=10, alpha=0.0002, beta=0.02):
 ###############################################################################
 
 if __name__ == "__main__":
-    numpy.random.seed(0)
     R = [
-         [5,3,0,1],
-         [4,0,0,1],
-         [1,1,0,5],
+         [5,2,0,1],
+         [1,4,0,5],
+         [4,0,5,1],
          [1,0,0,4],
-         [0,1,5,4],
+         [0,5,1,4],
         ]
 
     R = numpy.array(R)
@@ -153,81 +140,6 @@ if __name__ == "__main__":
     Q = numpy.random.rand(M,K)
 
     nP, nQ = matrix_factorization(R, P, Q, K)
-
     nR = numpy.dot(nP, nQ.T)
-    print(nR)
 
-
-    def trainIncrementalSVD(data, K=40, steps=10, alpha=0.0002, beta=0.02, alphaReg=True, Q=None, P=None):
-        if Q is None:
-            N = len(data)
-            M = len(data[0])
-
-            P = np.random.rand(N, K)
-            Q = np.random.rand(M, K)
-
-            Q = Q.T
-        check = 0
-        if alphaReg:
-            curAlpha = 0.01
-        else:
-            curAlpha = alpha
-
-        # Map non zeros
-        print "Mapping actual values."
-        valueMap = []
-        for row in xrange(len(data)):
-            for col in xrange(len(data[row])):
-                if data[row][col] > 0:
-                    valueMap.append((row, col))
-        print "Actual values mapped."
-
-        # loopTime = 0.0
-        # otherTime = 0.0
-        for step in xrange(steps):
-
-            print "Step: ", step
-
-            if curAlpha > alpha:
-                curAlpha *= 0.90
-
-            '''stepLen = step*len(data)
-            if stepLen+row > check:
-                #print("Start")
-                check += steps*len(data) * 0.01
-
-                mae = 0.0
-                rse = 0.0
-                count = 0
-                skipRate = 500
-                for i in xrange(0,len(data),skipRate):
-                    for j in xrange(0,len(data[i]),skipRate):
-                        if data[i][j] > 0:
-                            mae += abs(data[i][j] - np.dot(P[i,:],Q[:,j]))  # Mean absolute error(MAE)
-                            rse += pow(data[i][j] - np.dot(P[i,:],Q[:,j]), 2)  # Mean absolute error(MAE)
-                            count += 1
-                mae = mae / count if count>0 else None
-                rse = rse / count if count>0 else None
-
-                perc = round((step * len(data) + row) * 100.0 / (steps * len(data)), 2)
-
-                print "Percentage completed: ", perc #, "%. Estimated mean absolute error: ", round(mae,3), ". Estimate root square error: ", round(rse, 3)
-                if mae < 0.001:
-                    break'''
-
-            alphaBeta = curAlpha * beta
-            # otherTime += time.time()-start
-            # start = time.time()
-            # print("Ready")
-            for valLoc in valueMap:
-                eij = data[row][col] - np.dot(P[valLoc[0], :], Q[:, valLoc[1]])
-                eAlpha2 = curAlpha * 2 * eij
-                for k in xrange(K):
-                    P[valLoc[0]][k] += eAlpha2 * Q[k][valLoc[1]] - alphaBeta * P[row][k]
-                    Q[k][valLoc[1]] += eAlpha2 * P[valLoc[0]][k] - alphaBeta * Q[k][valLoc[1]]
-            # loopTime += time.time() - start
-
-        # print "Looptime: ", loopTime, ". Other: ", otherTime
-
-        nR = np.dot(P, Q)
-        return nR
+    print nR

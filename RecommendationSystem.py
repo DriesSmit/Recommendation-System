@@ -8,7 +8,7 @@ from scipy.sparse.linalg import svds
 #Please refer to Report.odt for a more detailed explanation and result page
 #of each algorithm
 
-def trainFullSVD(data,demean=True):
+def trainFullSVD(data,K=25,demean=True):
     # user-item_rating = average_item_rating + (average_user_rating)
 
     # Adding data to missing entries to better generalise
@@ -23,19 +23,19 @@ def trainFullSVD(data,demean=True):
 
     start = time.time()
     tableData = data.copy()
-
-    print "Copied table in ", round(time.time()-start,2) ,"seconds. Calculating means in table..."
+    #print("Herer")
+    '''print "Copied table in ", round(time.time()-start,2) ,"seconds. Calculating means in table..."
     start = time.time()
     meanRows = np.zeros(len(tableData))
     meanColumns = np.zeros(len(tableData[0]))
     rowCount = np.zeros(len(tableData))
     columnsCount = np.zeros(len(tableData[0]))
-
+    #check = 0.0
     for i in range(len(tableData)):
 
-        '''if i * len(tableData[0]) > check:
-            check += len(tableData) * len(tableData[0]) * 0.01
-            print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 0), "%"'''
+        #if i * len(tableData[0]) > check:
+        #    check += len(tableData) * len(tableData[0]) * 0.01
+        #    print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 0), "%"
 
         for j in range(len(tableData[0])):
             if tableData[i][j] != 0.0:
@@ -69,15 +69,15 @@ def trainFullSVD(data,demean=True):
     print "Means calculated in ", round(time.time() - start, 2), "seconds. Artificially adding data..."
     start = time.time()
     for i in range(len(tableData)):
-        '''if i * len(tableData[0]) > check:
-                    check += len(tableData) * len(tableData[0]) * 0.01
-                    print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 0), "%"'''
+        #if i * len(tableData[0]) > check:
+        #            check += len(tableData) * len(tableData[0]) * 0.01
+        #            print "Percentage completed: ", round(i * 100.0 / (len(tableData)), 0), "%"
         for j in range(len(tableData[0])):
             if tableData[i][j] == 0.0:
                 tableData[i][j] = meanColumns[j] + meanRows[i]-avgUserRatings # Average rating for each movie adjusted
                 # by how harsh the user rates compared to the average rating
 
-    print "Added artificial data in  ", round(time.time() - start, 2), " seconds. De-meaning and calculating SVD..."
+    print "Added artificial data in  ", round(time.time() - start, 2), " seconds. De-meaning and calculating SVD..."'''
 
     # Calculate the SVD
 
@@ -88,8 +88,10 @@ def trainFullSVD(data,demean=True):
         R_demeaned = tableData - user_ratings_mean.reshape(-1, 1)
         # Calculate the SVD
         #R_demeaned.asfptype()
-        U, sigma, Vt = svds(R_demeaned, k=25)
-
+        #print "Working"
+        #newArr = np.array(R_demeaned,dtype=np.float32)
+        U, sigma, Vt = svds(R_demeaned, k=K)
+        #print("Done")
         # The matrices need to be converted to lower byte type to calculate the full table
         # for the 20m rating dataset.
         sigma = np.array(np.diag(sigma),dtype=np.float16)
@@ -97,10 +99,9 @@ def trainFullSVD(data,demean=True):
         Vt = np.array(Vt, dtype=np.float16)
         all_user_predicted_ratings = np.dot(np.array(np.dot(U, sigma)), Vt) + user_ratings_mean.reshape(-1, 1)
     else:
-        U, sigma, Vt = svds(tableData, k=25)    # k=40 means that 40 features of users will be considerd.
+        U, sigma, Vt = svds(tableData, k=K)    # k=40 means that 40 features of users will be considered.
                                                 # Thus one user might be 80% user type 1 and 20% user type 2 and so
                                                 # forth.
-
         # The matrices need to be converted to lower byte type to calculate the full table
         # for the 20m rating dataset.
         sigma = np.array(np.diag(sigma), dtype=np.float16)
@@ -175,7 +176,7 @@ def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, 
                 mae = mae / len(valueMap)
                 rse = rse / len(valueMap)'''
                 perc = round((indexVal+step*len(valueMap)) * 100.0 / (steps*len(valueMap)), 1)
-                print "Percentage completed: ", perc  # , "%. Mean absolute error: ", round(mae,4), ". Root square error: ", round(rse, 3)
+                print "Percentage completed: ", perc , "%"#. Mean absolute error: ", round(mae,4), ". Root square error: ", round(rse, 3)
                 '''if mae < 0.001:
                     break'''
 
@@ -188,12 +189,11 @@ def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, 
 
     model = []
 
-    #P = np.array(P, dtype=np.float16) #Convert back for if the whole table needs to be calculated.
-    #Q = np.array(Q, dtype=np.float16) #
+    #P = np.array(P, dtype=np.float16) # Convert back to 16 bit float if the whole table needs to be calculated.
+    #Q = np.array(Q, dtype=np.float16) # The is reduce the memory needed to represent the table.
 
     model.append(P)
     model.append(Q)
-    #nR = np.dot(P, Q) #If the database grows more it might not be necessary to even calculate the full SVD matrix.
     return model
 
 def trainFullIncSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine FullInc to use both the previous functions. Save code
@@ -230,7 +230,7 @@ def trainFullIncSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02):#Com
     print "FullIncSVD: Mean absolute error: ", round(mae, 3), ". Root square error: ", round(rse, 3)
     return model
 
-def train(tableData,valueMap,algs=['SVD']):
+def train(tableData,valueMap,algs=['SVD'],iter=200):
     function_mappings = {
         'SVDFull': trainFullSVD,
         'SVDInc': trainIncrementalSVD,
@@ -248,14 +248,14 @@ def train(tableData,valueMap,algs=['SVD']):
         start = time.time()
         if curAlg=='SVDFull':
             print "Training ", curAlg, "..."
-            model,_,_,_ = function_mappings[curAlg](tableData)
+            model,_,_,_ = function_mappings[curAlg](tableData,K=25)
             models[0] = model
         elif curAlg=='SVDInc':
             print "Training ", curAlg,"..."
-            models[1] = function_mappings[curAlg](tableData,valueMap,K=25,steps=10)
+            models[1] = function_mappings[curAlg](tableData,valueMap,K=25,steps=iter)
         elif curAlg=='SVDFullInc':
             print "Training ", curAlg,"..."
-            models[2] = function_mappings[curAlg](tableData,valueMap,K=25,steps=10,alpha=0.000001)
+            models[2] = function_mappings[curAlg](tableData,valueMap,K=25,steps=iter,alpha=0.000001)
         trainTime[i] += time.time() - start
         print "Training time for ",curAlg, " is ", trainTime[i], "."
 
@@ -369,5 +369,4 @@ def incSVD(model,userMap,movieMap,userID,itemID):
     movieLoc = movieMap[itemID]
     P = model[0]
     Q = model[1]
-
     return np.dot(P[userLoc, :], Q[:, movieLoc])

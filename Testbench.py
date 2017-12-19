@@ -232,7 +232,7 @@ def createData(ratingsLoc,userLoc,movieLoc,seperator,seperator2='::'):
 
     return hashTrainData,tableTrainData,hashTestData,userMap,movieMap,valueMap
 
-def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,testPerAlg,algs=['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']):
+def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,testPerAlg=1000,algs=['pearson_similarity','SVD','general_popularity','euclidean_similarity','cosine_similarity','randomItem']):
     print("Testing algorithms:")
 
     function_mappings = {
@@ -242,12 +242,12 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
         'cosine_similarity': rs.cosine_similarity,
         'randomItem': rs.randomItem,
     }
-    #print("Value: ",data['Dries Smit']['MovieD'])
+
     results = np.zeros(len(algs))
     runTime = np.zeros(len(algs))
     check = 0
     for test in range(testPerAlg):
-        if test > check:
+        if test >= check:
             check += testPerAlg * 0.01
             print "Percentage completed: ", round(test*100.0/testPerAlg,2), "%"
 
@@ -258,9 +258,7 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
             memberID = testHasData.keys()[memberIndex]
 
         itemIndex = int((len(testHasData[memberID]) * random.random()))
-        #print itemIndex, " ",int((len(testHasData[memberID])))
         itemID = testHasData[memberID].keys()[itemIndex]
-        #print "Item: ", itemIndex, " ", itemID
 
         for i,curAlg in enumerate(algs):
             start = time.time()
@@ -282,10 +280,6 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
             else:
                 print "Incorrect algorithm name entered: ", curAlg
             runTime[i] += time.time()-start
-
-            # I don't think mean squared error is needed yet. But it is a good practice to implement when actually
-            # using the system.
-
             '''if curAlg=="euclidean_similarity":
                 print("Alg rec: ",rec,". True ans: ",data[memberID][itemID])'''
 
@@ -294,10 +288,10 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
     results /= testPerAlg
     return results,runTime
 # Database of 20m
-'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-20m/'
+dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-20m/'
 ratingsFile = dir + 'ratings.csv'
 userLocation = dir + 'users.csv'
-movieLocation = dir + 'movies.csv'''
+movieLocation = dir + 'movies.csv'
 
 # Database of 1m
 '''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
@@ -307,21 +301,22 @@ movieLocation = dir + 'movies.dat'
 sep2 = sep = '::'''
 
 # Database of 100k
-dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
+'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
 ratingsFile = dir + 'u.data'
 userLocation = dir + 'u.user'
 movieLocation = dir + 'u.item'
 sep = '\t'
-sep2 = '|'
+sep2 = '|'''
 
-#trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData20ml(ratingsFile,movieLocation)
-trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
+trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData20ml(ratingsFile,movieLocation)
+#trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
 
 # ['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
-algs = ['SVDFull','SVDFullInc','SVDInc']
-trainTimes,models = rs.train(trainTableData,valueMap,algs=algs) #Train all the algorithms
+#algs = ['SVDFull','SVDFullInc','SVDInc']
+algs = ['SVDInc','general_popularity']
+trainTimes,models = rs.train(trainTableData,valueMap,algs=algs,iter=2) #Train all the algorithms
 
-result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,200,algs=algs) #Test all the algorithms
+result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,testPerAlg=500,algs=algs) #Test all the algorithms
 print "Results: ", result
 
 x = np.arange(len(algs))
