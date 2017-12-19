@@ -90,7 +90,7 @@ def trainFullSVD(data,K=25,demean=True):
         #R_demeaned.asfptype()
         #print "Working"
         #newArr = np.array(R_demeaned,dtype=np.float32)
-        
+
         # This function only works with 32 or 64 bit floats, which is impractical for large datasets.
         # Maybe try another library. Otherwise just use the iterative implementation.
         U, sigma, Vt = svds(R_demeaned, k=K)

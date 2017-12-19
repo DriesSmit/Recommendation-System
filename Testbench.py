@@ -314,9 +314,9 @@ trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createDat
 # ['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 #algs = ['SVDFull','SVDFullInc','SVDInc']
 algs = ['SVDInc','general_popularity']
-trainTimes,models = rs.train(trainTableData,valueMap,algs=algs,iter=2) #Train all the algorithms
+trainTimes,models = rs.train(trainTableData,valueMap,algs=algs,iter=50) #Train all the algorithms
 
-result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,testPerAlg=500,algs=algs) #Test all the algorithms
+result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,testPerAlg=2000,algs=algs) #Test all the algorithms
 print "Results: ", result
 
 x = np.arange(len(algs))
