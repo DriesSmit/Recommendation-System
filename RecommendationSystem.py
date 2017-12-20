@@ -24,7 +24,7 @@ def trainFullSVD(data,K=25,demean=True):
     start = time.time()
     tableData = data.copy()
     #print("Herer")
-    '''print "Copied table in ", round(time.time()-start,2) ,"seconds. Calculating means in table..."
+    print "Copied table in ", round(time.time()-start,2) ,"seconds. Calculating means in table..."
     start = time.time()
     meanRows = np.zeros(len(tableData))
     meanColumns = np.zeros(len(tableData[0]))
@@ -77,7 +77,7 @@ def trainFullSVD(data,K=25,demean=True):
                 tableData[i][j] = meanColumns[j] + meanRows[i]-avgUserRatings # Average rating for each movie adjusted
                 # by how harsh the user rates compared to the average rating
 
-    print "Added artificial data in  ", round(time.time() - start, 2), " seconds. De-meaning and calculating SVD..."'''
+    print "Added artificial data in  ", round(time.time() - start, 2), " seconds. De-meaning and calculating SVD..."
 
     # Calculate the SVD
 
@@ -136,11 +136,7 @@ def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, 
         M = len(data[0])
 
         P = np.random.rand(N, K)
-
         Q = np.random.rand(M, K)
-
-
-
         Q = Q.T
     check = 0
 

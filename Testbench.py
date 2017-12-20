@@ -313,7 +313,7 @@ trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createDat
 
 # ['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 #algs = ['SVDFull','SVDFullInc','SVDInc']
-algs = ['SVDFull','SVDInc','general_popularity']
+algs = ['SVDFull','SVDFullInc','SVDInc']
 trainTimes,models = rs.train(trainTableData,valueMap,algs=algs,iter=50) #Train all the algorithms
 
 result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,testPerAlg=2000,algs=algs) #Test all the algorithms
