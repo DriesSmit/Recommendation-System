@@ -130,6 +130,7 @@ def trainFullSVD(data,K=25,demean=True):
     return all_user_predicted_ratings,U, sigma, Vt
 
 def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, alphaReg=True, Q=None, P=None):
+    # This is actually more a general Matrix Factorisation algorithm than SVD
     if Q is None:
         N = len(data)
         M = len(data[0])

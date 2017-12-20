@@ -294,11 +294,11 @@ userLocation = dir + 'users.csv'
 movieLocation = dir + 'movies.csv'
 
 # Database of 1m
-'''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
+dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-1m/'
 ratingsFile = dir + 'ratings.dat'
 userLocation = dir + 'users.dat'
 movieLocation = dir + 'movies.dat'
-sep2 = sep = '::'''
+sep2 = sep = '::'
 
 # Database of 100k
 '''dir = '/home/dries/dev/RecommendationSystem/Data/MovieLens/ml-100k/'
@@ -308,12 +308,12 @@ movieLocation = dir + 'u.item'
 sep = '\t'
 sep2 = '|'''
 
-trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData20ml(ratingsFile,movieLocation)
-#trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
+#trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData20ml(ratingsFile,movieLocation)
+trainHashData, trainTableData,testHashData,userMap,movieMap,valueMap = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
 
 # ['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 #algs = ['SVDFull','SVDFullInc','SVDInc']
-algs = ['SVDInc','general_popularity']
+algs = ['SVDFull','SVDInc','general_popularity']
 trainTimes,models = rs.train(trainTableData,valueMap,algs=algs,iter=50) #Train all the algorithms
 
 result,runTime = evaluate(trainHashData,trainTableData,testHashData,models,userMap,movieMap,testPerAlg=2000,algs=algs) #Test all the algorithms
