@@ -4,10 +4,43 @@ import numpy as np
 import time
 from scipy.sparse.linalg import svds
 
-#Comments
-#Please refer to Report.odt for a more detailed explanation and result page
-#of each algorithm
+# Refer to Report.odt for a more detailed explanation and result page
+# of each algorithm.
 
+# This function is called to train the different algorithms.
+def train(tableData,valueMap,algs=['SVD'],iter=200):
+    function_mappings = {
+        'SVDFull': trainFullSVD,
+        'SVDInc': trainIncrementalSVD,
+        'SVDFullInc': trainFullIncSVD,
+    }
+
+    trainTime = np.zeros(len(algs))
+    models = []
+    models.append(None)
+    models.append(None)
+    models.append(None)
+
+    for i, curAlg in enumerate(algs):
+        #print(curAlg)
+        start = time.time()
+        if curAlg=='SVDFull':
+            print "Training ", curAlg, "..."
+            model,_,_,_ = function_mappings[curAlg](tableData,K=25)
+            models[0] = model
+        elif curAlg=='SVDInc':
+            print "Training ", curAlg,"..."
+            models[1] = function_mappings[curAlg](tableData,valueMap,K=25,steps=iter)
+        elif curAlg=='SVDFullInc':
+            print "Training ", curAlg,"..."
+            models[2] = function_mappings[curAlg](tableData,valueMap,K=25,steps=iter,alpha=0.000001)
+        trainTime[i] += time.time() - start
+        print "Training time for ",curAlg, " is ", trainTime[i], "."
+
+    print "Training done."
+    return trainTime, models
+
+# This function does a full SVD on the data using K features.
 def trainFullSVD(data,K=25,demean=True):
     # user-item_rating = average_item_rating + (average_user_rating)
 
@@ -46,7 +79,7 @@ def trainFullSVD(data,K=25,demean=True):
                 meanColumns[j] += tableData[i][j]
                 columnsCount[j] += 1
 
-                avgUserRating = tableData[i][j]
+                #avgUserRating = tableData[i][j]
 
 
     #print "Now dividing the means ", time.time()-start, " seconds into mean calculation."
@@ -80,7 +113,6 @@ def trainFullSVD(data,K=25,demean=True):
     print "Added artificial data in  ", round(time.time() - start, 2), " seconds. De-meaning and calculating SVD..."
 
     # Calculate the SVD
-
     start = time.time()
 
     if demean:
@@ -129,6 +161,7 @@ def trainFullSVD(data,K=25,demean=True):
 
     return all_user_predicted_ratings,U, sigma, Vt
 
+# This function implements a iterative SVD on the data using K features.
 def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, alphaReg=True, Q=None, P=None):
     # This is actually more a general Matrix Factorisation algorithm than SVD
     if Q is None:
@@ -196,6 +229,7 @@ def trainIncrementalSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02, 
     model.append(Q)
     return model
 
+# This function uses both a full and then a iterative SVD on the data using K features.
 def trainFullIncSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02):#Combine FullInc to use both the previous functions. Save code
     ratingSVDFull,U, sigma, Q = trainFullSVD(data,demean=False)
     e = 0
@@ -230,38 +264,8 @@ def trainFullIncSVD(data,valueMap, K=40, steps=10, alpha=0.0002, beta=0.02):#Com
     print "FullIncSVD: Mean absolute error: ", round(mae, 3), ". Root square error: ", round(rse, 3)
     return model
 
-def train(tableData,valueMap,algs=['SVD'],iter=200):
-    function_mappings = {
-        'SVDFull': trainFullSVD,
-        'SVDInc': trainIncrementalSVD,
-        'SVDFullInc': trainFullIncSVD,
-    }
 
-    trainTime = np.zeros(len(algs))
-    models = []
-    models.append(None)
-    models.append(None)
-    models.append(None)
-
-    for i, curAlg in enumerate(algs):
-        #print(curAlg)
-        start = time.time()
-        if curAlg=='SVDFull':
-            print "Training ", curAlg, "..."
-            model,_,_,_ = function_mappings[curAlg](tableData,K=25)
-            models[0] = model
-        elif curAlg=='SVDInc':
-            print "Training ", curAlg,"..."
-            models[1] = function_mappings[curAlg](tableData,valueMap,K=25,steps=iter)
-        elif curAlg=='SVDFullInc':
-            print "Training ", curAlg,"..."
-            models[2] = function_mappings[curAlg](tableData,valueMap,K=25,steps=iter,alpha=0.000001)
-        trainTime[i] += time.time() - start
-        print "Training time for ",curAlg, " is ", trainTime[i], "."
-
-    print "Training done."
-    return trainTime, models
-
+# The following 3 functions implements the 3 different similarity algorithms as indicated by their respective names.
 def euclidean_similarity(data,person1, person2):
 
 	common_ranked_items = [itm for itm in data[person1] if itm in data[person2]]
@@ -309,6 +313,8 @@ def cosine_similarity(data,person1,person2):
     #print"Here:", ans
     return ans
 
+# This function uses the above 3 algorithms to find a rating for a given person, item combo.
+
 def recommend(data,person, item,bound, similarity=pearson_similarity):
 
     #print(person)
@@ -339,10 +345,9 @@ def recommend(data,person, item,bound, similarity=pearson_similarity):
     # just add 0.0001 to sim to increase speed.
     return recomms
 
+# This function assigns ratings based on an item's average rating.
+# This function, if used, can be improved to use less processing power by calculating all the means beforehand.
 def general_popularity(data,movieMap, item):
-
-    # This function, if used, can be sped up by calculating all the means beforehand.
-
     meanScore = 0.0
     meanCount = 0
 
@@ -356,8 +361,11 @@ def general_popularity(data,movieMap, item):
 
     return meanScore
 
+# This function assigns random ratings to a item. This is only used to benchmark other algorithms.
 def randomItem():
-    return random.random()
+    return random.random()*5.0
+
+# These functions are used to predict ratings for a user movie combo.
 
 def tableSVD(model,userMap,movieMap,userID,itemID):
     # Get the user's predictions
