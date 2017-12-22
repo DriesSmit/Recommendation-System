@@ -258,8 +258,8 @@ def  evaluate(trainHashData,trainTableData,testHasData,models,userMap,movieMap,t
             start = time.time()
             limit = 150
 
-            # It doesn't look like there is a case statement alternative in python. Further will be faster to store the
-            # tests in an array and then run it separately for each algorithm, but this format looks better.
+            # It doesn't look like there is a case statement alternative in python. It will be faster to store the
+            # tests in an array and then run it separately for each algorithm, but this format looks better and with little time lost.
             if curAlg=="euclidean_similarity" or curAlg=="pearson_similarity" or curAlg=="cosine_similarity":   #K nearest neighbors algorithms
                 rec = rs.recommend(trainHashData,memberID, itemID, limit, function_mappings[curAlg])
             elif curAlg=="general_popularity":
@@ -315,13 +315,12 @@ sep2 = '|'
 trainHashData, trainTableData,testHashData,userMap,movieMap,valueList = createData(ratingsFile,userLocation,movieLocation,seperator=sep,seperator2=sep2)
 
 # Train all the algorithms listed. This default setup takes about 8 minutes to compute on a i5 processor.
-#algs = ['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
-algs = ['SVDInc']
+algs = ['pearson_similarity','SVDFull','SVDFullInc','SVDInc','general_popularity','euclidean_similarity','cosine_similarity','randomItem']
 # algs = ['pearson_similarity','randomItem']
 
 # A better way to implement the algorithms might be to create a object for each function.
 # Then a list for each object can be used instead of transfering just the models as is done.
-trainTimes,models = rs.train(trainTableData,valueList,algs=algs,iter=10)
+trainTimes,models = rs.train(trainTableData,valueList,algs=algs,iter=50)
 
 # Example code of loading and saving model
 # rs.incSVDSave(models[1])
