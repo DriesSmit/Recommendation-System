@@ -274,6 +274,10 @@ def euclidean_similarity(data,person1, person2):
 
 	return 1 / (1 + sum(distance))
 
+# There is still a mistake with using recommend function after this one.
+# If Mary always rates 1 more that John they will score a perfect correlation(1.0)
+# But the recommend function does not account for the difference in their ratings.
+# To do this the average of each user to the main user must be taken into account.
 def pearson_similarity(data,person1, person2):
 
     common_ranked_items = [itm for itm in data[person1] if itm in data[person2]]
